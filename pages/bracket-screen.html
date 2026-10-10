@@ -54,6 +54,65 @@
     .bs-empty{text-align:center;color:var(--muted);font:700 .8rem var(--mono);letter-spacing:.14em}
     .bs-empty h2{font:900 3rem var(--display);color:#fff;letter-spacing:.06em;margin:0 0 8px}
   </style>
+  <style id="bs-polish">
+    /* ===== Bigger bracket ===== */
+    .bs{padding:20px 36px 18px;gap:16px}
+    .bs-rounds{gap:90px}
+    .bs-round{width:400px}
+    .bs-round-head{font-size:1.4rem;margin-bottom:16px}
+    .bs-round-head small{font-size:.64rem;margin-top:5px}
+    .bs-col{gap:24px}
+    .bs-match{min-height:116px}
+    .bs-tag{font-size:.62rem;padding:2px 10px;top:-11px;left:14px}
+    .bs-team{padding:16px 20px;min-height:58px;gap:14px}
+    .bs-team .n{font-size:1.55rem;letter-spacing:.04em}
+    .bs-team .s{font-size:2rem}
+    .bs-bye{font-size:.62rem;padding:6px 16px 12px}
+    .bs-lines path{stroke-width:3}.bs-lines path.adv{stroke-width:4}
+    .bs-chip{padding:12px 18px}.bs-chip small{font-size:.62rem}.bs-chip strong{font-size:1.5rem;margin-top:6px}
+    .bs-champion{padding:10px 24px}.bs-champion strong{font-size:clamp(1.8rem,3vw,2.9rem)}
+
+    /* ===== Ambient ===== */
+    .bs-head{position:relative}
+    .bs-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;pointer-events:none;
+      background:linear-gradient(90deg,transparent,#e11d2e 20%,#fff 50%,#e11d2e 80%,transparent);background-size:220% 100%;animation:bsp-sheen 6s linear infinite}
+    .bs-lines path.adv{stroke-dasharray:12 9;animation:bsp-flow 1.1s linear infinite}      /* energy flowing along advanced paths */
+    .bs-match.live{animation:bsp-live 2s ease-in-out infinite}
+    .bs-match.live::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.1) 50%,transparent 65%);background-size:250% 100%;animation:bsp-scan 3.2s linear infinite}
+    .bs-chip.live strong::before{content:"";display:inline-block;width:.5em;height:.5em;margin-right:.5em;border-radius:50%;background:#ff4655;vertical-align:.08em;animation:bsp-blink 1.3s ease-in-out infinite}
+    .bs-champion.on{animation:bsp-champ-in 1s cubic-bezier(.2,1.2,.3,1) both,bsp-champ 2.4s 1s ease-in-out infinite}
+    @keyframes bsp-sheen{from{background-position:220% 0}to{background-position:-220% 0}}
+    @keyframes bsp-flow{to{stroke-dashoffset:-21}}
+    @keyframes bsp-live{50%{box-shadow:0 0 0 1px rgba(255,70,85,.75),0 0 48px rgba(225,29,46,.55)}}
+    @keyframes bsp-scan{from{background-position:250% 0}to{background-position:-150% 0}}
+    @keyframes bsp-blink{50%{opacity:.25}}
+    @keyframes bsp-champ-in{from{opacity:0;scale:.6;filter:blur(8px)}to{opacity:1;scale:1;filter:blur(0)}}
+    @keyframes bsp-champ{50%{box-shadow:0 0 38px rgba(244,201,93,.45)}}
+
+    /* ===== Intro (first render only; JS adds body.bs-intro for ~3s) ===== */
+    body.bs-intro .bs-head{animation:bsp-drop .7s cubic-bezier(.2,.85,.25,1) both}
+    body.bs-intro .bs-foot{animation:bsp-rise .7s .5s cubic-bezier(.2,.85,.25,1) both}
+    body.bs-intro .bs-round-head{animation:bsp-fade .6s both;animation-delay:var(--d,0s)}
+    body.bs-intro .bs-match{animation:bsp-pop .65s cubic-bezier(.2,1.2,.3,1) both;animation-delay:var(--d,0s)}
+    body.bs-intro .bs-lines{animation:bsp-fade 1s 1.2s both}
+    @keyframes bsp-drop{from{opacity:0;translate:0 -24px}to{opacity:1;translate:0 0}}
+    @keyframes bsp-rise{from{opacity:0;translate:0 24px}to{opacity:1;translate:0 0}}
+    @keyframes bsp-fade{from{opacity:0}to{opacity:1}}
+    @keyframes bsp-pop{from{opacity:0;translate:0 22px;scale:.94}to{opacity:1;translate:0 0;scale:1}}
+
+    /* ===== Updates (JS adds these when something changes) ===== */
+    .bs-match.bsp-done{animation:bsp-done 1.4s ease-out both}
+    .bs-match.bsp-done .bs-team.win{animation:bsp-win 1.4s ease-out both}
+    .bsp-tick{animation:bsp-tick .7s cubic-bezier(.2,1.2,.3,1) both}
+    .bsp-bump{animation:bsp-bump .8s cubic-bezier(.2,1.4,.4,1) both}
+    @keyframes bsp-done{0%{box-shadow:0 0 0 0 rgba(95,224,160,.85)}100%{box-shadow:0 0 0 26px rgba(95,224,160,0)}}
+    @keyframes bsp-win{0%{filter:brightness(2.2)}100%{filter:brightness(1)}}
+    @keyframes bsp-tick{from{opacity:0;translate:-26px 0;filter:blur(3px)}to{opacity:1;translate:0 0;filter:blur(0)}}
+    @keyframes bsp-bump{0%{scale:1}35%{scale:1.4;color:#5fe0a0}100%{scale:1}}
+    strong.bsp-chip{animation:bsp-tick .6s cubic-bezier(.2,1.2,.3,1) both}
+
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important}}
+  </style>
 </head>
 <body class="bs-body">
   <main class="bs" aria-label="Tournament bracket">
@@ -68,5 +127,61 @@
       <div class="bs-chip"><small>TEAMS STILL ALIVE</small><strong id="bs-alive">—</strong></div>
     </footer>
   </main>
+  <script id="bs-polish-js">
+    /* Watches the bracket the page already draws and adds animations; it never changes the data. */
+    (() => {
+      const $ = (id) => document.getElementById(id), fit = $('bs-fit');
+      const INTRO_MS = 3400, t0 = Date.now();
+      let prev = null, introUntil = 0, timer, introStart = 0;
+      const flashes = new Map();   // key -> start time; re-applied if the page redraws mid-animation
+
+      const snap = () => {
+        const out = new Map();
+        fit.querySelectorAll('.bs-round').forEach((r, ri) => r.querySelectorAll('.bs-match').forEach((m, mi) => {
+          out.set(ri + '-' + mi, { el: m, ri, mi, done: m.classList.contains('done') || m.classList.contains('final-done'),
+            teams: [...m.querySelectorAll('.bs-team')].map((t) => ({ el: t, n: (t.querySelector('.n') || {}).textContent || '', s: (t.querySelector('.s') || {}).textContent || '', tbd: t.classList.contains('tbd') })) });
+        }));
+        return out;
+      };
+      const play = (el, cls, ms) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); };
+
+      function intro(cur) {                         // delays are relative to the intro start, so a mid-intro redraw doesn't restart it
+        const el = (Date.now() - introStart) / 1000;
+        fit.querySelectorAll('.bs-round').forEach((r, ri) => {
+          const h = r.querySelector('.bs-round-head'); if (h) h.style.setProperty('--d', (ri * 0.3 - el) + 's');
+        });
+        cur.forEach((c) => c.el.style.setProperty('--d', (0.15 + c.ri * 0.3 + c.mi * 0.08 - el) + 's'));
+      }
+
+      function update() {
+        const cur = snap(); if (!cur.size) return;
+        const now = Date.now();
+        if (!prev) { introStart = now; introUntil = now + INTRO_MS; document.body.classList.add('bs-intro'); setTimeout(() => document.body.classList.remove('bs-intro'), INTRO_MS); }
+        if (now < introUntil) intro(cur);
+
+        cur.forEach((c, key) => {
+          const p = prev && prev.get(key);
+          if (p) {
+            if (!p.done && c.done) flashes.set(key, now);
+            c.teams.forEach((t, i) => {
+              const pt = p.teams[i]; if (!pt) return;
+              if (t.n !== pt.n && !t.tbd) play(t.el.querySelector('.n') || t.el, 'bsp-tick', 800);          // a team advanced into this slot
+              if (t.s !== pt.s && t.s.trim() && t.s !== '—') { const s = t.el.querySelector('.s'); if (s) play(s, 'bsp-bump', 900); }
+            });
+          }
+          const f = flashes.get(key);                                                                       // keep a finished-match flash going across redraws
+          if (f && now - f < 1500) { c.el.classList.add('bsp-done'); c.el.style.animationDelay = -(now - f) / 1000 + 's'; c.el.querySelectorAll('.bs-team.win').forEach((w) => { w.style.animationDelay = -(now - f) / 1000 + 's'; }); }
+        });
+        prev = cur;
+      }
+      new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(update, 50); }).observe(fit, { childList: true, subtree: true });
+
+      ['bs-live', 'bs-next', 'bs-alive', 'bs-champion-name'].forEach((id) => {
+        const el = $(id); if (!el) return; let last = el.textContent;
+        new MutationObserver(() => { if (el.textContent === last) return; last = el.textContent; play(el, 'bsp-chip', 700); }).observe(el, { childList: true, characterData: true, subtree: true });
+      });
+      window.addEventListener('load', () => setTimeout(update, 200), { once: true });
+    })();
+  </script>
 </body>
 </html>
