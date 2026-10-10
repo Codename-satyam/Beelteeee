@@ -294,13 +294,43 @@
 
     @media (prefers-reduced-motion:reduce){.lp-tick,.lp-bump,.side-swap.on,.win-card,.win-celebration::before,body.live-overlay .scoreboard,body.live-overlay .toss-banner,body.live-overlay .scoreboard::before,body.live-overlay .versus .vs,.ss-a,.ss-b,.ss-mid i,.ss-mid em,.live-team.scored::after,.live-team.swapping::after{animation:none!important}}
   </style>
+  <style id="live-logos">
+    /* ===== Team logos (outer edge of each panel) ===== */
+    :root{--logo:clamp(104px,9.5vw,150px);--logo-pad:calc(var(--logo) + clamp(16px,2.2vw,32px))}
+    body.live-overlay .live-team .team-logo{position:absolute;top:calc(50% - 8px);translate:0 -50%;width:var(--logo);height:var(--logo);z-index:3;pointer-events:none;display:none}
+    body.live-overlay .live-team.a .team-logo{left:clamp(8px,1.4vw,22px)}
+    body.live-overlay .live-team.b .team-logo{right:clamp(8px,1.4vw,22px)}
+    body.live-overlay .live-team.has-logo .team-logo{display:block}
+    .team-logo::before{content:"";position:absolute;inset:-8%;z-index:-1;background:radial-gradient(circle,rgba(var(--acc-rgb,120,120,132),.3),transparent 66%)}
+    .team-logo img{width:100%;height:100%;object-fit:contain;scale:1.18;filter:drop-shadow(0 8px 18px rgba(var(--acc-rgb,0,0,0),.4))}
+    /* text block + score shift away from the logo so nothing overlaps */
+    body.live-overlay .live-team.a.has-logo{padding-left:var(--logo-pad)}
+    body.live-overlay .live-team.b.has-logo{padding-right:var(--logo-pad)}
+    body.live-overlay .live-team.a.has-logo .score{left:var(--logo-pad)}
+    body.live-overlay .live-team.b.has-logo .score{right:var(--logo-pad)}
+    body.live-overlay .live-team.has-logo{box-shadow:inset 0 3px 0 rgba(var(--c),.85),inset 0 -3px 0 rgba(var(--acc-rgb),.9)}  /* top = role colour, bottom = team colour */
+    body.live-overlay .live-team.has-logo .team-name{text-shadow:0 0 26px rgba(var(--acc-rgb),.4)}
+    .team-logo.logo-in{animation:lp-logo-in .8s cubic-bezier(.2,1.1,.3,1) both}
+    @keyframes lp-logo-in{from{opacity:0;scale:.55;rotate:-10deg}to{opacity:1;scale:1;rotate:0deg}}
+
+    /* ===== Logos in the toss banner, side-swap stinger and win card ===== */
+    .mini-logo{width:30px;height:30px;object-fit:contain;scale:1.25}
+    .ss-logo{width:clamp(54px,7vw,92px);height:clamp(54px,7vw,92px);object-fit:contain;scale:1.15;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))}
+    .win-logo{display:block;width:clamp(90px,16vh,150px);height:clamp(90px,16vh,150px);object-fit:contain;margin:0 auto 4px;scale:1.15;filter:drop-shadow(0 0 26px rgba(var(--acc-rgb,255,70,85),.55))}
+    .mini-logo[hidden],.ss-logo[hidden],.win-logo[hidden]{display:none}
+
+    @media (max-width:850px){body.live-overlay .live-team .team-logo{display:none !important}
+      body.live-overlay .live-team.a.has-logo{padding-left:8px}body.live-overlay .live-team.b.has-logo{padding-right:8px}
+      body.live-overlay .live-team.a.has-logo .score{left:0}body.live-overlay .live-team.b.has-logo .score{right:0}}
+    @media (prefers-reduced-motion:reduce){.team-logo.logo-in{animation:none!important}}
+  </style>
 </head>
 <body class="live-overlay">
   <main class="live-shell" aria-label="The Entity Championship live overlay">
     <header class="toss-banner" id="toss-banner" aria-live="polite">
       <span class="toss-banner-mark" aria-hidden="true">✦</span>
       <span class="toss-banner-label">TOSS WINNER</span>
-      <strong id="toss-winner-name">Awaiting toss</strong>
+      <img class="mini-logo" id="toss-img" alt="" hidden><strong id="toss-winner-name">Awaiting toss</strong>
       <span class="toss-banner-advantage" id="toss-advantage">FIRST MAP BAN</span>
     </header>
 
@@ -316,7 +346,7 @@
       <div class="teams-score">
         <div class="live-team a" id="team-a-panel">
           <div class="side-label">TEAM A</div>
-          <img id="team-a-img" src="" alt="" style="width: 80px; height: 80px; object-fit: contain; margin-top: 10px;">
+          <div class="team-logo" id="team-a-logo"><img id="team-a-img" alt="" hidden></div>
           <div class="team-name" id="team-a-name">Waiting for teams</div>
           <div class="team-role" id="team-a-role" data-role="none">AWAITING ROLE</div>
           <div class="team-status" id="team-a-status">No active match</div>
@@ -328,7 +358,7 @@
         </div>
         <div class="live-team b" id="team-b-panel">
           <div class="side-label">TEAM B</div>
-          <img id="team-b-img" src="" alt="" style="width: 80px; height: 80px; object-fit: contain; margin-top: 10px;">
+          <div class="team-logo" id="team-b-logo"><img id="team-b-img" alt="" hidden></div>
           <div class="team-name" id="team-b-name">Waiting for teams</div>
           <div class="team-role" id="team-b-role" data-role="none">AWAITING ROLE</div>
           <div class="team-status" id="team-b-status">No active match</div>
@@ -341,9 +371,9 @@
         <span class="winner-detail" id="winner-detail">WINNER · PENDING</span>
       </div>
       <div class="side-swap" id="side-swap" aria-hidden="true">
-        <div class="ss-lane ss-a"><b id="ss-a-name"></b><span id="ss-a-role"></span></div>
+        <div class="ss-lane ss-a"><img class="ss-logo" id="ss-a-img" alt="" hidden><b id="ss-a-name"></b><span id="ss-a-role"></span></div>
         <div class="ss-mid"><i>⇄</i><em>SIDES SWAP</em></div>
-        <div class="ss-lane ss-b"><b id="ss-b-name"></b><span id="ss-b-role"></span></div>
+        <div class="ss-lane ss-b"><img class="ss-logo" id="ss-b-img" alt="" hidden><b id="ss-b-name"></b><span id="ss-b-role"></span></div>
       </div>
     </section>
 
@@ -354,6 +384,7 @@
     <div class="win-celebration" id="win-celebration" hidden aria-live="assertive">
       <div class="win-particles" id="win-particles" aria-hidden="true"></div>
       <div class="win-card">
+        <img class="win-logo" id="celebration-img" alt="" hidden>
         <div class="win-kicker"><span></span> THE ENTITY HAS CHOSEN <span></span></div>
         <div class="win-title">MATCH WINNER</div>
         <div class="win-name" id="celebration-winner">TEAM NAME</div>
@@ -509,6 +540,56 @@
         ['team-a-name','team-b-name','selected-map','toss-winner-name','round-label','match-state','match-number','winner-detail'].forEach((id) => watch(id, 'lp-tick'));
         lead();
       }, { once: true });
+    })();
+  </script>
+  <script id="live-logos-js">
+    (() => {
+      /* ===== CONFIG ===== */
+      const LOGO_DIR = 'New Folder/';    // folder that holds the PNGs, relative to this page (case-sensitive on Vercel)
+      const TEAMS = {                    // key = a word in the team's name (any case) → logo file + accent colour (r,g,b)
+        boys:     { file: 'Boys.png',     acc: '245,197,24'  },
+        eternity: { file: 'eternity.png', acc: '139,123,255' },
+        hakle:    { file: 'Hakle.png',    acc: '255,59,59'   },
+        nicesu:   { file: 'Nicesu.png',   acc: '255,162,26'  },
+        onyx:     { file: 'Onyx.png',     acc: '166,120,255' },
+        vibes:    { file: 'Vibes.png',    acc: '255,63,180'  },
+        vrty:     { file: 'Vrty.png',     acc: '61,242,192'  },
+        yo:       { file: 'Yo.png',       acc: '255,122,46'  }
+      };
+      /* ================== */
+      const $ = (id) => document.getElementById(id);
+      const find = (name) => { for (const t of String(name || '').toLowerCase().split(/[^a-z0-9]+/)) if (t && TEAMS[t]) return TEAMS[t]; return null; };
+      const url = (t) => encodeURI(LOGO_DIR + t.file);
+      function setImg(img, team) {
+        if (!img) return false;
+        if (!team) { img.hidden = true; img.removeAttribute('src'); return false; }
+        if (img.getAttribute('src') !== url(team)) img.src = url(team);
+        img.hidden = false; return true;
+      }
+      function watchText(id, fn) {
+        const el = $(id); if (!el) return; let last;
+        const run = () => { const t = el.textContent; if (t === last) return; last = t; fn(find(t)); };
+        new MutationObserver(run).observe(el, { childList: true, characterData: true, subtree: true }); run();
+      }
+
+      for (const k of ['a', 'b']) {
+        const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap = $('team-' + k + '-logo');
+        img.addEventListener('error', () => { panel.classList.remove('has-logo'); console.warn('[logos] could not load', img.src); });
+        watchText('team-' + k + '-name', (team) => {
+          const ok = setImg(img, team); panel.classList.toggle('has-logo', ok);
+          if (!ok) return panel.style.removeProperty('--acc-rgb');
+          panel.style.setProperty('--acc-rgb', team.acc);
+          wrap.classList.remove('logo-in'); void wrap.offsetWidth; wrap.classList.add('logo-in');
+        });
+      }
+      watchText('toss-winner-name', (team) => setImg($('toss-img'), team));
+      watchText('celebration-winner', (team) => { const i = $('celebration-img'); if (setImg(i, team)) i.style.setProperty('--acc-rgb', team.acc); });
+
+      const swap = window.sideSwapStinger;   // add logos to the side-swap stinger
+      window.sideSwapStinger = (a, b) => {
+        setImg($('ss-a-img'), find($('team-a-name').textContent)); setImg($('ss-b-img'), find($('team-b-name').textContent));
+        if (swap) swap(a, b);
+      };
     })();
   </script>
 </body>
