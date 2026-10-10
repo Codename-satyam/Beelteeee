@@ -7,6 +7,13 @@
   let prev = null;
   let celebrationTimer = null;
 
+  // New folder mapping
+  const TEAM_IMAGES = {
+    'Crimson Wolves': '../New folder/Yo.png',
+    'Night Owls': '../New folder/Onyx.png',
+    // Add other team name mappings here as needed
+  };
+
   function currentMatch(state) {
     const requested = params.get('match');
     if (requested) { const m = state.matches.find((x) => x.id === requested); if (m) return m; }
@@ -47,6 +54,11 @@
     set('round-label', 'AWAITING MATCH'); set('match-state', 'NOT STARTED'); set('match-number', 'MATCH —');
     set('team-a-name', state.teams.length ? 'Match not selected' : 'Waiting for teams');
     set('team-b-name', state.teams.length ? 'Match not selected' : 'Waiting for teams');
+
+    // Clear images
+    const imgA = $('team-a-img'); if (imgA) imgA.src = '';
+    const imgB = $('team-b-img'); if (imgB) imgB.src = '';
+
     set('team-a-score', '—'); set('team-b-score', '—');
     set('team-a-status', 'No active match'); set('team-b-status', 'No active match');
     set('selected-map', 'NOT SELECTED');
@@ -66,6 +78,11 @@
     set('match-state', live ? 'LIVE NOW' : match.status === 'completed' ? 'MATCH COMPLETE' : 'UP NEXT');
     set('match-number', 'MATCH ' + String(match.matchNumber).padStart(2, '0'));
     set('team-a-name', nameA); set('team-b-name', nameB);
+
+    // Update images
+    const imgA = $('team-a-img'); if (imgA) imgA.src = TEAM_IMAGES[nameA] || '';
+    const imgB = $('team-b-img'); if (imgB) imgB.src = TEAM_IMAGES[nameB] || '';
+
     const a = match.scoreA == null ? 0 : match.scoreA;
     const b = match.scoreB == null ? 0 : match.scoreB;
     set('team-a-score', fmt(a)); set('team-b-score', fmt(b));
