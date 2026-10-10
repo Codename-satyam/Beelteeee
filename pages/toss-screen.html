@@ -27,19 +27,44 @@
   .scene.on { display:flex }
 
   /* ---------- toss ---------- */
-  #toss { flex-direction:column; align-items:center; justify-content:center; gap:4vh; perspective:1200px }
-  .coin { width:min(30vh,28vw); aspect-ratio:1; position:relative; transform-style:preserve-3d }
-  .coin i { position:absolute; inset:0; border-radius:50%; display:grid; place-items:center; backface-visibility:hidden;
-    font:800 clamp(30px,6vh,64px) 'Barlow Condensed'; color:#2b1d00;
-    background:radial-gradient(circle at 35% 30%, #fff1b0, var(--gold) 45%, #9b7312); border:6px solid #c99a1c;
-    box-shadow:inset 0 0 0 8px rgba(255,255,255,.18), 0 20px 60px rgba(245,197,66,.25) }
-  .coin i:last-child { transform:rotateY(180deg) }
-  .coin.flip { animation:flip 2.6s cubic-bezier(.2,.7,.2,1) forwards }
-  .coin.heads { --end:1800deg } .coin.tails { --end:1980deg }
-  @keyframes flip { 0% { transform:translateY(0) rotateY(0) } 45% { transform:translateY(-22vh) rotateY(calc(var(--end)*.6)) } 100% { transform:translateY(0) rotateY(var(--end)) } }
+  #toss { flex-direction:column; align-items:center; justify-content:center; gap:5vh; perspective:1400px }
+  .coin-wrap { --d:min(28vh,26vw); width:var(--d); height:var(--d); position:relative; margin-top:14vh }
+  .coin { position:absolute; inset:0; transform-style:preserve-3d }
+  .coin s, .coin i { position:absolute; inset:0; border-radius:50%; display:block; text-decoration:none }
+  .coin s { background:#b98a16; border:3px solid #8f6a0e }                       /* edge layers = thickness */
+  .coin i { backface-visibility:hidden; display:grid; place-content:center; justify-items:center; gap:.1em; text-align:center;
+    font:800 calc(var(--d)*.2)/1 'Barlow Condensed'; letter-spacing:.04em; color:#2b1d00;
+    background:radial-gradient(circle at 32% 28%, #fff4b8, var(--gold) 42%, #a37a14 100%); border:calc(var(--d)*.035) solid #c99a1c;
+    box-shadow:inset 0 0 0 calc(var(--d)*.04) rgba(255,255,255,.2), inset 0 0 calc(var(--d)*.12) rgba(120,80,0,.55) }
+  .coin i::before { content:"✦"; font-size:.7em; opacity:.75 }
+  .coin i.front { transform:translateZ(7px) }
+  .coin i.back  { transform:rotateX(180deg) translateZ(7px) }
+  .coin-shadow { position:absolute; left:10%; right:10%; bottom:-9vh; height:3.2vh; border-radius:50%;
+    background:radial-gradient(ellipse, rgba(0,0,0,.65), transparent 70%); transform-origin:center }
+  .coin-wrap::after { content:""; position:absolute; inset:-6%; border-radius:50%; border:4px solid var(--gold); opacity:0; pointer-events:none }
+
+  .coin-wrap.throw { animation:arc 2.6s linear forwards }
+  .coin-wrap.throw .coin { animation:spin 2.6s cubic-bezier(.15,.6,.25,1) forwards }
+  .coin-wrap.throw .coin-shadow { animation:shade 2.6s linear forwards }
+  .coin-wrap.heads { --end:2160deg } .coin-wrap.tails { --end:2340deg }       /* 6 spins = heads up, 6.5 = tails up */
+  .coin-wrap.land::after { animation:ring .9s ease-out forwards }
+  .coin-wrap.land .coin { filter:drop-shadow(0 0 40px rgba(245,197,66,.55)) }
+
+  @keyframes arc {
+    0%   { transform:translateY(0);     animation-timing-function:cubic-bezier(.2,.7,.3,1) }
+    42%  { transform:translateY(-34vh); animation-timing-function:cubic-bezier(.7,0,.9,.4) }
+    80%  { transform:translateY(0);     animation-timing-function:ease-out }
+    90%  { transform:translateY(-4.5vh);animation-timing-function:ease-in }
+    100% { transform:translateY(0) } }
+  @keyframes spin  { from { transform:rotateX(0) } to { transform:rotateX(var(--end)) } }
+  @keyframes shade { 0%,100% { transform:scale(1); opacity:1 } 42% { transform:scale(.35); opacity:.35 } 80% { transform:scale(1); opacity:1 } 90% { transform:scale(.8); opacity:.7 } }
+  @keyframes ring  { from { transform:scale(.9); opacity:.9 } to { transform:scale(1.9); opacity:0 } }
+
   .toss-line { font:800 clamp(30px,6vh,80px) 'Barlow Condensed'; text-align:center; min-height:1.2em }
   .toss-line em { font-style:normal; color:var(--red) }
+  .toss-line.dim { color:var(--dim); font-size:clamp(20px,3.4vh,44px); letter-spacing:.2em }
   .toss-line.pop { animation:pop .5s cubic-bezier(.2,1.4,.4,1) }
+  .toss-result { font:700 clamp(18px,3vh,40px) 'Barlow Condensed'; letter-spacing:.2em; color:var(--gold); min-height:1.2em }
   @keyframes pop { from { transform:scale(.7); opacity:0 } to { transform:scale(1); opacity:1 } }
 
   /* ---------- veto ---------- */
@@ -81,7 +106,8 @@
   <div class="body">
     <section class="scene on" id="idle"><div class="toss-line" style="margin:auto;color:var(--dim)">Waiting for the match ceremony to start…</div></section>
     <section class="scene" id="toss">
-      <div class="coin" id="coin"><i>HEADS</i><i>TAILS</i></div>
+      <div class="coin-wrap" id="coinwrap"><div class="coin" id="coin"></div><div class="coin-shadow"></div></div>
+      <div class="toss-result" id="tossresult"></div>
       <div class="toss-line" id="tossline"></div>
     </section>
     <section class="scene" id="veto"><div class="grid" id="grid"></div></section>
@@ -99,25 +125,27 @@
 const STATE_KEY = 'entity-championship-state-v1';
 const CHANNEL   = 'entity-championship-sync-v1';
 
+/* Turns the controller's saved tournament state into what this scene needs. Never throws. */
 function normalize(r) {
-  if (!r || !r.matches) return null;
+  if (!r || !Array.isArray(r.matches)) return null;
+  const teams = r.teams || [];
   const match = r.matches.find(m => m.id === r.activeMatchId) || r.matches.find(m => m.status === 'in_progress') || r.matches.find(m => m.status === 'pending') || r.matches[0];
   if (!match) return null;
-  const toss = match.toss || {};
-  const veto = match.mapVeto || {};
-  const teamN = (id) => r.teams.find(t => t.id === id)?.name || 'TBD';
+  const toss = match.toss || {}, veto = match.mapVeto || {};
+  const teamN = id => teams.find(t => t.id === id)?.name || 'TBD';
+  const A = match.teamAId, B = match.teamBId;
+  const bans = (Array.isArray(veto.bans) ? veto.bans : []).map(b => typeof b === 'string' ? { map:b, teamId:null } : { map: b.map?.id ?? b.map?.name ?? b.map ?? b.id, teamId: b.teamId });
+  const first = toss.winnerId || null, second = first === A ? B : A;
+  const finalMap = veto.finalMap?.id ?? veto.finalMap?.name ?? veto.finalMap ?? null;
   return {
-    teamAId: match.teamAId,
-    teamBId: match.teamBId,
-    teamAName: teamN(match.teamAId),
-    teamBName: teamN(match.teamBId),
+    teamAId: A, teamBId: B, teamAName: teamN(A), teamBName: teamN(B),
     coin: toss.side || null,
-    tossWinnerId: toss.winnerId || null,
+    tossWinnerId: first,
     pool: (veto.pool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img }),
-    bans: (veto.bans || []).map(b => ({ map: b.map, teamId: b.teamId })),
-    finalMap: veto.finalMap || null,
-    turn: match.status === 'in_progress' ? (veto.bans.length % 2 === 0 ? toss.winnerId : (toss.winnerId === match.teamAId ? match.teamBId : match.teamAId)) : null,
-    flipId: toss.savedAt || null
+    bans, finalMap,
+    turn: first && !finalMap ? (bans.length % 2 === 0 ? first : second) : null,
+    // stable per match + result: a re-save of the same toss must NOT replay the coin flip
+    tossKey: `${match.id}:${toss.side || ''}:${first || ''}`
   };
 }
 async function loadRemote() { return null; }
@@ -125,73 +153,73 @@ async function loadRemote() { return null; }
 const $ = id => document.getElementById(id);
 const scenes = ['idle','toss','veto','done'];
 let prev = { bans:new Set(), coinShown:null, scene:'idle' };
+let current = null, lastNorm = null, tossBusy = false;
 
 function show(name) { scenes.forEach(s => $(s).classList.toggle('on', s === name)); prev.scene = name; }
 const teamName = (st, tId) => tId === st.teamAId ? st.teamAName : (tId === st.teamBId ? st.teamBName : 'TBD');
 
 function render(st) {
-  if (!st || (!st.pool.length && !st.coin && !st.tossWinnerId)) { show('idle'); return; }
+  if (!st || (!st.pool.length && !st.coin && !st.tossWinnerId)) { if (!tossBusy) show('idle'); return; }
   $('ta').textContent = st.teamAName; $('tb').textContent = st.teamBName;
   const isA = t => t === st.teamAId, isB = t => t === st.teamBId;
   $('ta').classList.toggle('turn', isA(st.turn)); $('tb').classList.toggle('turn', isB(st.turn));
   $('ta').classList.toggle('dim', !!st.turn && !isA(st.turn)); $('tb').classList.toggle('dim', !!st.turn && !isB(st.turn));
 
-  /* ---- scene: final ---- */
+  if (tossBusy) return;                         // let the flip finish; render(current) runs afterwards
+
   if (st.finalMap) {
     const m = st.pool.find(p => p.id === st.finalMap) || { name: st.finalMap };
     $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamAName}  vs  ${st.teamBName}`;
     $('phase').textContent = 'Map locked'; $('turn').textContent = '';
     show('done'); syncBans(st, true); return;
   }
-
-  /* ---- scene: toss ---- */
-  if (!st.bans.length && st.coin && st.tossWinnerId && prev.coinShown !== st.flipId + ':' + st.tossWinnerId) {
-    runToss(st); return;
-  }
-  if (prev.scene === 'toss' && tossBusy) return;
-
+  if (!st.bans.length && st.coin && st.tossWinnerId && prev.coinShown !== st.tossKey) { runToss(st); return; }
   if (!st.pool.length) { show('idle'); return; }
 
-  /* ---- scene: veto ---- */
   $('phase').textContent = 'Map veto';
   $('turn').textContent = st.turn ? `${teamName(st, st.turn)} to ban` : '';
   show('veto'); syncBans(st);
 }
 
-let tossBusy = false;
+function buildCoin() {
+  const c = $('coin'); if (c.dataset.built) return; c.dataset.built = 1;
+  let h = ''; for (let z = -6; z <= 6; z += 2) h += `<s style="transform:translateZ(${z}px)"></s>`;
+  c.innerHTML = h + '<i class="front">HEADS</i><i class="back">TAILS</i>';
+}
 function runToss(st) {
-  tossBusy = true; prev.coinShown = st.flipId + ':' + st.tossWinnerId;
+  tossBusy = true; prev.coinShown = st.tossKey;
   show('toss'); $('phase').textContent = 'Coin toss'; $('turn').textContent = '';
-  const coin = $('coin'), line = $('tossline');
-  coin.className = 'coin'; line.textContent = ''; line.classList.remove('pop'); void coin.offsetWidth;
-  coin.classList.add('flip', String(st.coin).toLowerCase() === 'tails' ? 'tails' : 'heads');
-  setTimeout(() => {
-    line.innerHTML = `<em>${teamName(st, st.tossWinnerId)}</em> wins the toss — bans first`;
-    line.classList.add('pop');
-  }, 2700);
-  setTimeout(() => { tossBusy = false; render(current); }, 5200);
+  buildCoin();
+  const wrap = $('coinwrap'), line = $('tossline'), res = $('tossresult');
+  const tails = String(st.coin).toLowerCase() === 'tails';
+  wrap.className = 'coin-wrap'; res.textContent = '';
+  line.className = 'toss-line dim'; line.textContent = 'FLIPPING…'; void wrap.offsetWidth;
+  wrap.classList.add(tails ? 'tails' : 'heads', 'throw');
+  setTimeout(() => { wrap.classList.add('land'); res.textContent = tails ? 'TAILS' : 'HEADS'; }, 2600);
+  setTimeout(() => { line.className = 'toss-line pop'; line.innerHTML = `<em>${esc(teamName(st, st.tossWinnerId))}</em> wins the toss — bans first`; }, 3200);
+  setTimeout(() => { tossBusy = false; render(current); }, 6000);
 }
 
 function syncBans(st, quiet) {
   const grid = $('grid');
   const cols = st.pool.length <= 4 ? st.pool.length : st.pool.length <= 8 ? 4 : 5;
   grid.style.setProperty('--cols', Math.max(cols, 1));
-  const sig = st.pool.map(p => p.id).join('|');
+  const sig = st.pool.map(p => p.id).sort().join('|');   // order-independent: a reshuffled pool is not a new pool
+  let rebuilt = false;
   if (grid.dataset.sig !== sig) {
-    grid.dataset.sig = sig; prev.bans = new Set();
+    grid.dataset.sig = sig; rebuilt = true;
     grid.innerHTML = st.pool.map(p => `<div class="map-card" data-id="${esc(p.id)}">
       <div class="map-art" style="${p.image ? `background-image:url('${esc(p.image)}')` : `background:${hue(p.name)}`}"></div>
       <span class="by"></span><span class="name">${esc(p.name)}</span></div>`).join('');
   }
   const banned = new Map(st.bans.map(b => [b.map, b.teamId]));
   grid.querySelectorAll('.map-card').forEach(el => {
-    const id = el.dataset.id, isBanned = banned.has(id);
-    const wasBanned = prev.bans.has(id);
+    const id = el.dataset.id, isBanned = banned.has(id), wasBanned = prev.bans.has(id);
     el.classList.toggle('banned', isBanned);
     el.classList.toggle('final', id === st.finalMap);
     el.classList.remove('just-banned');
     if (isBanned) el.querySelector('.by').textContent = 'BANNED · ' + teamName(st, banned.get(id));
-    if (isBanned && !wasBanned && !quiet) { void el.offsetWidth; el.classList.add('just-banned'); }
+    if (isBanned && !wasBanned && !quiet && !rebuilt) { void el.offsetWidth; el.classList.add('just-banned'); }  // animate only genuinely new bans
   });
   prev.bans = new Set(banned.keys());
 }
@@ -200,8 +228,13 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const hue = n => { let h = 0; for (const c of String(n)) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(135deg,hsl(${h} 45% 22%),hsl(${(h+50)%360} 55% 12%))`; };
 
 /* ---------- data wiring ---------- */
-let current = null;
-function ingest(raw) { current = normalize(raw); render(current); }
+function ingest(raw) {
+  try {
+    const n = normalize(raw), k = JSON.stringify(n);
+    if (k === lastNorm) return;                 // ignore saves that changed nothing we display (timestamps, heartbeats…)
+    lastNorm = k; current = n; render(n);
+  } catch (err) { console.error('toss-screen render failed', err); }
+}
 function readLocal() { try { return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } }
 function setConn(ok, txt) { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; }
 
@@ -210,24 +243,27 @@ if (params.get('bg') === 'transparent') document.body.classList.add('transparent
 
 if (params.get('demo')) {
   setConn(true, 'Demo mode');
-  const pool = ['Ashfall','Citadel','Dunemark','Emberhold','Frostgate','Gloam','Hollow Keep'].map(n => ({ id:n, name:n }));
-  const st = { teamAName:'Crimson Wolves', teamBName:'Night Owls', pool:[], bans:[], coin:null, tossWinnerId:null, finalMap:null, turn:null };
-  const step = (fn, ms) => new Promise(r => setTimeout(() => { fn(); ingest(st); r(); }, ms));
+  const names = ['Ashfall','Citadel','Dunemark','Emberhold','Frostgate','Gloam','Hollow Keep'];
+  const raw = { activeMatchId:'m1', teams:[{id:'t1',name:'Crimson Wolves'},{id:'t2',name:'Night Owls'}],
+    matches:[{ id:'m1', teamAId:'t1', teamBId:'t2', status:'in_progress', toss:{}, mapVeto:{ pool:[], bans:[], finalMap:null } }] };
+  const m = raw.matches[0], wait = ms => new Promise(r => setTimeout(r, ms));
   (async () => {
-    ingest({teams:[], matches:[]}); // dummy
-    // demo mode for this overlay screen needs special handling or mock data
+    ingest(raw); await wait(1200);
+    m.toss = { side:'heads', winnerId:'t1' }; m.mapVeto.pool = names; ingest(raw); await wait(5600);
+    for (let i = 0; i < 6; i++) {
+      const left = names.filter(n => !m.mapVeto.bans.some(b => b.map === n));
+      m.mapVeto.bans.push({ map:left[Math.floor(Math.random()*left.length)], teamId: i % 2 ? 't2' : 't1' });
+      ingest(raw); await wait(2200);
+    }
+    m.mapVeto.finalMap = names.find(n => !m.mapVeto.bans.some(b => b.map === n)); ingest(raw);
   })();
 } else {
-  ingest(readLocal());
-  setConn(!!readLocal(), readLocal() ? 'Live' : 'Waiting for controller');
-  window.addEventListener('storage', e => { if (e.key === STATE_KEY) { ingest(readLocal()); setConn(true, 'Live'); } });
-  try { new BroadcastChannel(CHANNEL).onmessage = e => { ingest(e.data); setConn(true, 'Live'); }; } catch {}
-  setInterval(async () => {
-    const raw = (await loadRemote()) || readLocal();
-    const next = JSON.stringify(raw);
-    if (next !== poll.last) { poll.last = next; ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }
-  }, 1000);
-  var poll = { last: JSON.stringify(readLocal()) };
+  const sync = () => { const raw = readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); };
+  sync();
+  window.addEventListener('storage', e => { if (e.key === STATE_KEY || e.key === null) sync(); });
+  // the controller's broadcast payload may be a ping, not the state — always re-read the saved state
+  try { new BroadcastChannel(CHANNEL).onmessage = e => { const d = e.data; d && d.matches ? ingest(d) : sync(); }; } catch {}
+  setInterval(async () => { const raw = (await loadRemote()) || readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }, 1000);
 }
 </script>
 </body>
