@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en" class="overlay-mode">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="transparent">
+  <title>Live Overlay — The Entity Championship</title>
+  <link rel="stylesheet" href="../shared/shared.css">
+  <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="../shared/shared.js"></script>
+  <script defer src="../shared/scoring-engine.js"></script>
+  <script defer src="../shared/live-page.js"></script>
+  <style>
+    /* Live overlay-only adjustments. Keep shared project files untouched. */
+    html.overlay-mode, html.overlay-mode body, body.live-overlay {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+    body.live-overlay .live-shell {
+      width: min(1260px, calc(100% - 80px));
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: clamp(8px, 1.4vh, 16px);
+      padding: clamp(14px, 2.5vh, 26px) 0;
+    }
+    body.live-overlay .scoreboard {
+      align-self: center;
+      justify-self: center;
+      width: 100%;
+    }
+    body.live-overlay .teams-score {
+      align-items: stretch;
+    }
+    body.live-overlay .live-team {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      /* Use a definite panel height so the score can anchor to its bottom. */
+      height: clamp(220px, 25vh, 270px);
+      min-height: 0;
+      padding: clamp(16px, 2.2vh, 24px) clamp(12px, 1.8vw, 24px) 86px;
+      transition: background .42s ease, filter .42s ease;
+    }
+    body.live-overlay .live-team[data-role="killer"] {
+      background: linear-gradient(180deg, rgba(225,29,46,.075), transparent 74%);
+    }
+    body.live-overlay .live-team[data-role="survivor"] {
+      background: linear-gradient(180deg, rgba(112,232,244,.07), transparent 74%);
+    }
+    body.live-overlay .live-team .team-name {
+      margin: clamp(7px, 1.1vh, 12px) 0 8px;
+      font-size: clamp(1.4rem, 3vw, 3.35rem);
+    }
+    .team-role {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 22px;
+      margin: 2px 0 7px;
+      padding: 4px 9px;
+      border: 1px solid rgba(255,255,255,.17);
+      background: rgba(0,0,0,.32);
+      color: #d1d1d9;
+      font: 800 clamp(.48rem, .58vw, .62rem)/1 var(--mono);
+      letter-spacing: .13em;
+      white-space: nowrap;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+    .team-role[data-role="killer"] {
+      border-color: rgba(255,100,117,.58);
+      color: #ff7581;
+      box-shadow: 0 0 15px rgba(255,70,85,.08);
+    }
+    .team-role[data-role="survivor"] {
+      border-color: rgba(112,232,244,.52);
+      color: #70e8f4;
+      box-shadow: 0 0 15px rgba(112,232,244,.08);
+    }
+    .team-role.role-flip { animation: role-swap-in .62s cubic-bezier(.2,.85,.25,1) both; }
+    .live-team.role-changing { animation: role-panel-pulse .62s ease both; }
+    @keyframes role-swap-in {
+      0% { opacity: .15; transform: perspective(500px) rotateX(-88deg) translateY(7px) scale(.9); filter: blur(4px); }
+      58% { opacity: 1; transform: perspective(500px) rotateX(12deg) translateY(-2px) scale(1.05); filter: blur(0); }
+      100% { opacity: 1; transform: perspective(500px) rotateX(0) translateY(0) scale(1); }
+    }
+    @keyframes role-panel-pulse {
+      0% { filter: brightness(.8); }
+      45% { filter: brightness(1.3); }
+      100% { filter: brightness(1); }
+    }
+    /* Put the score value at the foot of each team panel. */
+    body.live-overlay .live-team .team-status {
+      margin-top: 0;
+      font-size: clamp(.44rem, .54vw, .56rem);
+    }
+    body.live-overlay .live-team .score {
+      /* Absolute anchoring prevents flex/grid content from pulling it back to center. */
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: clamp(13px, 1.8vh, 20px);
+      margin: 0 !important;
+      padding: 0 !important;
+      text-align: center;
+      font-size: clamp(3rem, 7vh, 5.5rem);
+      line-height: .82;
+    }
+    /* This compact overlay intentionally removes the large points-schema strip. */
+    .points-schema { display: none !important; }
+    .score-popups, .point-popups { z-index: 30; }
+    @media (max-width: 850px) {
+      body.live-overlay .live-shell { width: calc(100% - 28px); padding: 12px 0; gap: 8px; }
+      body.live-overlay .live-team { height: 220px; min-height: 0; padding: 16px 8px 76px; }
+      body.live-overlay .live-team .score { font-size: clamp(2.7rem, 8vh, 4.4rem); }
+      body.live-overlay .toss-banner-advantage { display: none; }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .live-shell { width: calc(100% - 14px); }
+      body.live-overlay .live-team { height: 190px; min-height: 0; padding: 13px 4px 68px; }
+      body.live-overlay .live-team .score { font-size: clamp(2.3rem, 10vw, 3.5rem); }
+      .team-role { font-size: .42rem; letter-spacing: .06em; padding: 4px 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .team-role.role-flip, .live-team.role-changing { animation: none !important; }
+    }
+  </style>
+
+  <style id="bottom-docked-overlay-fix">
+    /* Keep the toss banner compact at the top while docking the ENTIRE scoreboard panel at the bottom. */
+    html.overlay-mode,
+    html.overlay-mode body,
+    body.live-overlay {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      overflow: hidden !important;
+    }
+
+    body.live-overlay .live-shell {
+      position: fixed !important;
+      inset: 0 !important;
+      width: min(1440px, calc(100% - 68px)) !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      min-height: 0 !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      display: block !important;
+      isolation: isolate;
+      overflow: visible;
+    }
+
+    body.live-overlay .toss-banner {
+      position: absolute !important;
+      top: clamp(14px, 2.6vh, 30px) !important;
+      left: 50% !important;
+      right: auto !important;
+      bottom: auto !important;
+      transform: translateX(-50%);
+      z-index: 10;
+      max-width: min(92%, 680px);
+      margin: 0;
+    }
+
+    body.live-overlay .scoreboard {
+      position: absolute !important;
+      top: auto !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: clamp(18px, 3.5vh, 38px) !important;
+      width: 100% !important;
+      margin: 0 !important;
+      transform: none !important;
+      z-index: 5;
+    }
+
+    /* Point-award popups stay aligned to the vertical center of the full panel. */
+    body.live-overlay .point-popups {
+      top: 50%;
+      bottom: auto;
+      z-index: 20;
+    }
+
+    @media (max-width: 850px) {
+      body.live-overlay .live-shell {
+        width: calc(100% - 24px) !important;
+      }
+      body.live-overlay .toss-banner {
+        max-width: 98%;
+      }
+    }
+
+    @media (max-width: 520px) {
+      body.live-overlay .live-shell {
+        width: calc(100% - 14px) !important;
+      }
+      body.live-overlay .scoreboard {
+        bottom: 12px !important;
+      }
+      body.live-overlay .toss-banner {
+        top: 10px !important;
+      }
+    }
+  </style>
+
+
+  <style id="live-missing-styles">
+    /* Styles for elements live.html uses that shared.css does not define. */
+    .toss-banner{display:flex;align-items:center;gap:10px;padding:8px 18px;border:1px solid rgba(244,201,93,.5);background:rgba(8,8,11,.86);color:#fff;font:700 .62rem var(--mono);letter-spacing:.12em;white-space:nowrap}
+    .toss-banner strong{font:900 1.15rem var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+    .toss-banner-mark{color:var(--red2)}.toss-banner-label{color:#aaaab8}.toss-banner-advantage{color:#d6d6de}
+    body.live-overlay .scoreboard{background:rgba(8,8,11,.9);border:1px solid #303039;backdrop-filter:blur(4px)}
+    .point-popups{position:absolute;top:50%;width:34%;height:0;display:flex;flex-direction:column;align-items:center;pointer-events:none}
+    .point-popups-a{left:0}.point-popups-b{right:0}
+    .point-popup{position:absolute;font:900 clamp(2.4rem,6vh,4.6rem)/1 var(--display);color:var(--green);text-shadow:0 0 22px rgba(95,224,160,.6);animation:point-pop 2.4s ease-out forwards}
+    @keyframes point-pop{0%{opacity:0;transform:translateY(24px) scale(.6)}15%{opacity:1;transform:translateY(0) scale(1.15)}70%{opacity:1}100%{opacity:0;transform:translateY(-80px) scale(1)}}
+    .win-celebration{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(225,29,46,.28),rgba(0,0,0,.78));animation:win-in .5s ease both}
+    .win-celebration[hidden]{display:none}
+    @keyframes win-in{from{opacity:0}to{opacity:1}}
+    .win-card{text-align:center;padding:34px 70px;border:1px solid var(--red);background:rgba(8,8,11,.92)}
+    .win-kicker{font:700 .6rem var(--mono);letter-spacing:.2em;color:var(--red2)}
+    .win-title{margin-top:12px;font:900 clamp(1.4rem,3vw,2.4rem) var(--display);letter-spacing:.2em;color:#c6c6d0}
+    .win-name{margin:8px 0;font:900 clamp(2.6rem,8vw,6.5rem)/.9 var(--display);text-transform:uppercase;color:#fff;overflow-wrap:anywhere}
+    .win-subtitle{font:700 .66rem var(--mono);letter-spacing:.2em;color:var(--gold)}
+    .win-particles i{position:absolute;top:-10px;width:6px;height:14px;background:var(--gold);opacity:.9;animation:win-fall linear infinite}
+    .win-particles i:nth-child(3n){background:var(--red2)}.win-particles i:nth-child(3n+1){background:#fff}
+    @keyframes win-fall{to{transform:translateY(110vh) rotate(540deg)}}
+  </style>
+</head>
+<body class="live-overlay">
+  <main class="live-shell" aria-label="The Entity Championship live overlay">
+    <header class="toss-banner" id="toss-banner" aria-live="polite">
+      <span class="toss-banner-mark" aria-hidden="true">✦</span>
+      <span class="toss-banner-label">TOSS WINNER</span>
+      <strong id="toss-winner-name">Awaiting toss</strong>
+      <span class="toss-banner-advantage" id="toss-advantage">FIRST MAP BAN</span>
+    </header>
+
+    <section class="scoreboard" id="scoreboard" aria-live="polite">
+      <div class="score-meta">
+        <span id="round-label">AWAITING MATCH</span>
+        <span class="meta-divider">◆</span>
+        <span id="match-state">NOT STARTED</span>
+        <span class="meta-divider">◆</span>
+        <span id="match-number">MATCH —</span>
+      </div>
+
+      <div class="teams-score">
+        <div class="live-team a" id="team-a-panel">
+          <div class="side-label">TEAM A</div>
+          <div class="team-name" id="team-a-name">Waiting for teams</div>
+          <div class="team-role" id="team-a-role" data-role="none">AWAITING ROLE</div>
+          <div class="team-status" id="team-a-status">No active match</div>
+          <div class="score" id="team-a-score">—</div>
+        </div>
+        <div class="versus">
+          <div class="vs">VS</div>
+          <div class="round" id="match-round">ENTITY<br>CHAMPIONSHIP</div>
+        </div>
+        <div class="live-team b" id="team-b-panel">
+          <div class="side-label">TEAM B</div>
+          <div class="team-name" id="team-b-name">Waiting for teams</div>
+          <div class="team-role" id="team-b-role" data-role="none">AWAITING ROLE</div>
+          <div class="team-status" id="team-b-status">No active match</div>
+          <div class="score" id="team-b-score">—</div>
+        </div>
+      </div>
+
+      <div class="score-extras">
+        <span>MAP <b id="selected-map">NOT SELECTED</b></span>
+        <span class="winner-detail" id="winner-detail">WINNER · PENDING</span>
+      </div>
+    </section>
+
+
+    <div class="point-popups point-popups-a" id="score-popups-a" aria-live="polite" aria-label="Team A points awarded"></div>
+    <div class="point-popups point-popups-b" id="score-popups-b" aria-live="polite" aria-label="Team B points awarded"></div>
+
+    <div class="win-celebration" id="win-celebration" hidden aria-live="assertive">
+      <div class="win-particles" id="win-particles" aria-hidden="true"></div>
+      <div class="win-card">
+        <div class="win-kicker"><span></span> THE ENTITY HAS CHOSEN <span></span></div>
+        <div class="win-title">MATCH WINNER</div>
+        <div class="win-name" id="celebration-winner">TEAM NAME</div>
+        <div class="win-subtitle">VICTORY CONFIRMED</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const params = new URLSearchParams(location.search);
+      let previous = null;
+
+      function selectedMatch(state) {
+        const requested = params.get('match');
+        if (requested) {
+          const exact = state.matches.find((match) => match.id === requested);
+          if (exact) return exact;
+        }
+        return Entity.activeMatch(state);
+      }
+
+      function paintRole(teamKey, role, animate) {
+        const panel = $('team-' + teamKey + '-panel');
+        const badge = $('team-' + teamKey + '-role');
+        panel.dataset.role = role.toLowerCase();
+        badge.dataset.role = role.toLowerCase();
+        badge.textContent = role;
+        if (animate) {
+          badge.classList.remove('role-flip');
+          panel.classList.remove('role-changing');
+          void badge.offsetWidth;
+          badge.classList.add('role-flip');
+          panel.classList.add('role-changing');
+          window.setTimeout(() => {
+            badge.classList.remove('role-flip');
+            panel.classList.remove('role-changing');
+          }, 700);
+        }
+      }
+
+      function renderRoles(state) {
+        if (!window.Entity || !state || !Array.isArray(state.matches)) return;
+        const match = selectedMatch(state);
+        if (!match || !match.teamAId || !match.teamBId) {
+          $('team-a-role').textContent = 'AWAITING ROLE';
+          $('team-b-role').textContent = 'AWAITING ROLE';
+          $('team-a-panel').dataset.role = 'none';
+          $('team-b-panel').dataset.role = 'none';
+          previous = null;
+          return;
+        }
+
+        // Game 1: A is Killer. Once Game 1 is confirmed, the scoring menu
+        // moves to Game 2: B is Killer. This follows the existing saved schema.
+        const card = match.scorecard || {};
+        const game1 = card.game1 || {};
+        const game2 = card.game2 || {};
+        const gameNo = (game1.confirmed || game2.started || game2.confirmed) ? 2 : 1;
+        const roleA = gameNo === 1 ? 'KILLER' : 'SURVIVOR';
+        const roleB = gameNo === 1 ? 'SURVIVOR' : 'KILLER';
+        const animate = Boolean(previous && previous.matchId === match.id &&
+          (previous.roleA !== roleA || previous.roleB !== roleB));
+
+        paintRole('a', roleA, animate && previous.roleA !== roleA);
+        paintRole('b', roleB, animate && previous.roleB !== roleB);
+        previous = { matchId: match.id, roleA, roleB, gameNo };
+      }
+
+      window.addEventListener('load', () => {
+        if (!window.Entity) return;
+        Entity.subscribe(renderRoles);
+        renderRoles(Entity.load());
+      }, { once: true });
+    })();
+  </script>
+
+
+  <script id="align-award-popups-to-docked-panel">
+    (() => {
+      const panel = document.getElementById('scoreboard');
+      const shell = document.querySelector('.live-shell');
+      const popups = [
+        document.getElementById('score-popups-a'),
+        document.getElementById('score-popups-b')
+      ];
+      if (!panel || !shell || popups.some((el) => !el)) return;
+
+      const align = () => {
+        const panelRect = panel.getBoundingClientRect();
+        const shellRect = shell.getBoundingClientRect();
+        const centerY = panelRect.top - shellRect.top + panelRect.height / 2;
+        for (const popup of popups) {
+          popup.style.top = `${centerY}px`;
+          popup.style.bottom = 'auto';
+        }
+      };
+
+      if ('ResizeObserver' in window) {
+        const observer = new ResizeObserver(align);
+        observer.observe(panel);
+      }
+      window.addEventListener('resize', align, { passive: true });
+      window.addEventListener('load', align, { once: true });
+      requestAnimationFrame(align);
+    })();
+  </script>
+
+</body>
+</html>

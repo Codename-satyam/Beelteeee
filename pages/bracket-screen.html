@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070709"><title>Bracket Screen — The Entity Championship</title>
+  <link rel="stylesheet" href="../shared/shared.css">
+  <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="../shared/shared.js"></script><script defer src="../shared/bracket-screen.js"></script>
+  <style>
+    /* Full-screen, read-only bracket for stream share / OBS. Add ?overlay=1 for a transparent background. */
+    html,body.bs-body{height:100%;margin:0;overflow:hidden}
+    html.overlay-mode body.bs-body{background:transparent!important}
+    .bs{position:fixed;inset:0;display:flex;flex-direction:column;padding:26px 40px 22px;gap:14px}
+    .bs-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line);padding-bottom:12px}
+    .bs-head h1{margin:4px 0 0;font:900 clamp(1.8rem,3.4vw,3.2rem)/.9 var(--display);letter-spacing:.06em;text-transform:uppercase}
+    .bs-head .eyebrow{font:700 .62rem var(--mono);letter-spacing:.2em;color:var(--red2)}
+    .bs-champion{display:none;align-items:center;gap:12px;padding:8px 18px;border:1px solid var(--gold);background:rgba(244,201,93,.1);color:var(--gold);font:700 .65rem var(--mono);letter-spacing:.16em}
+    .bs-champion strong{font:900 clamp(1.4rem,2.6vw,2.4rem)/1 var(--display);color:#fff;letter-spacing:.06em;text-transform:uppercase}
+    .bs-champion.on{display:flex}
+    .bs-stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+    .bs-fit{position:relative;transform-origin:center center;flex:none}
+    .bs-rounds{display:flex;gap:70px;align-items:stretch}
+    .bs-round{display:flex;flex-direction:column;width:300px;flex:none}
+    .bs-round-head{text-align:center;margin-bottom:12px;font:800 1rem var(--display);letter-spacing:.14em;color:#d9d9df;text-transform:uppercase}
+    .bs-round-head small{display:block;margin-top:3px;font:600 .5rem var(--mono);letter-spacing:.14em;color:var(--muted)}
+    .bs-col{flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:14px}
+    .bs-match{position:relative;border:1px solid #33333d;background:linear-gradient(180deg,#111117,#0b0b0f);min-height:78px}
+    .bs-match.live{border-color:var(--red2);box-shadow:0 0 0 1px rgba(255,70,85,.4),0 0 28px rgba(225,29,46,.3)}
+    .bs-match.done{border-color:#2a4a3b}
+    .bs-match.final-done{border-color:var(--gold);box-shadow:0 0 30px rgba(244,201,93,.25)}
+    .bs-tag{position:absolute;top:-9px;left:10px;padding:1px 7px;background:#09090c;border:1px solid #33333d;font:700 .46rem var(--mono);letter-spacing:.12em;color:var(--muted)}
+    .bs-match.live .bs-tag{border-color:var(--red2);color:#fff;background:var(--red);animation:bs-pulse 1.3s ease-in-out infinite}
+    .bs-match.done .bs-tag{color:#73e9ad;border-color:#246b4a}
+    @keyframes bs-pulse{50%{opacity:.55}}
+    .bs-team{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;min-height:38px}
+    .bs-team+.bs-team{border-top:1px solid #23232b}
+    .bs-team .n{min-width:0;font:800 1.08rem/1.05 var(--display);letter-spacing:.05em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bs-team .s{font:900 1.3rem/1 var(--display);font-variant-numeric:tabular-nums;color:#c6c6d0}
+    .bs-team.tbd .n{color:#5d5d6a;font-weight:600}
+    .bs-team.win{background:linear-gradient(90deg,rgba(95,224,160,.16),transparent)}
+    .bs-team.win .n{color:#fff}.bs-team.win .s{color:var(--green)}
+    .bs-team.win .n::after{content:" ▸";color:var(--green)}
+    .bs-team.lose .n,.bs-team.lose .s{color:#5d5d6a;text-decoration:line-through;text-decoration-thickness:1px}
+    .bs-match.bye{min-height:0;border-style:dashed;opacity:.8}
+    .bs-bye{padding:4px 12px 8px;font:700 .5rem var(--mono);letter-spacing:.12em;color:var(--gold)}
+    .bs-lines{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+    .bs-lines path{fill:none;stroke:#3a3a46;stroke-width:2}
+    .bs-lines path.adv{stroke:var(--green);stroke-width:3;filter:drop-shadow(0 0 5px rgba(95,224,160,.55))}
+    .bs-foot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .bs-chip{padding:9px 14px;border:1px solid #2b2b35;background:rgba(12,12,16,.85);min-width:0}
+    .bs-chip small{display:block;font:700 .5rem var(--mono);letter-spacing:.16em;color:var(--muted)}
+    .bs-chip strong{display:block;margin-top:4px;font:800 1.15rem/1.1 var(--display);letter-spacing:.05em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bs-chip.live{border-color:#80303a}.bs-chip.live small{color:#ff7884}
+    .bs-empty{text-align:center;color:var(--muted);font:700 .8rem var(--mono);letter-spacing:.14em}
+    .bs-empty h2{font:900 3rem var(--display);color:#fff;letter-spacing:.06em;margin:0 0 8px}
+  </style>
+</head>
+<body class="bs-body">
+  <main class="bs" aria-label="Tournament bracket">
+    <header class="bs-head">
+      <div><div class="eyebrow">Dead by Daylight · Tournament bracket</div><h1>The Entity Championship</h1></div>
+      <div class="bs-champion" id="bs-champion"><span>CHAMPION</span><strong id="bs-champion-name">—</strong></div>
+    </header>
+    <section class="bs-stage" id="bs-stage"><div class="bs-fit" id="bs-fit"></div></section>
+    <footer class="bs-foot">
+      <div class="bs-chip live"><small>NOW LIVE</small><strong id="bs-live">—</strong></div>
+      <div class="bs-chip"><small>UP NEXT</small><strong id="bs-next">—</strong></div>
+      <div class="bs-chip"><small>TEAMS STILL ALIVE</small><strong id="bs-alive">—</strong></div>
+    </footer>
+  </main>
+</body>
+</html>

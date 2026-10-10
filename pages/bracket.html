@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070709"><title>Bracket Control — The Entity Championship</title>
+  <link rel="stylesheet" href="../shared/shared.css"><script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="../shared/shared.js"></script>
+  <script defer src="../shared/scoring-engine.js"></script><script defer src="../shared/bracket-page.js"></script>
+</head>
+<body data-controller>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./index.html"><div class="brand-mark"><span>✦</span></div><div><div class="eyebrow">Ops // Tournament control</div><h1>The Entity Championship</h1></div></a>
+      <nav class="nav" aria-label="Main navigation"><a href="./index.html">Home</a><a href="./live.html">Live screen</a><a href="./toss.html">Map voting</a><a class="active" href="./bracket.html">Bracket control</a><a href="./bracket-screen.html">Bracket screen</a></nav>
+    </header>
+
+    <section class="section-heading"><div><div class="eyebrow">Control room</div><h2>Bracket & scoring</h2><p>Create your bracket, run the coin toss and map veto, then allocate match points and advance the winner.</p></div><div class="connection" id="save-indicator">Local browser storage</div></section>
+    <div class="cards" style="margin-bottom:18px">
+      <div class="stat"><small>Registered teams</small><strong id="stat-teams">0</strong></div>
+      <div class="stat"><small>Matches completed</small><strong id="stat-completed">0</strong></div>
+      <div class="stat"><small>Matches remaining</small><strong id="stat-remaining">0</strong></div>
+    </div>
+
+    <div class="layout-two">
+      <div style="display:grid;gap:18px;align-content:start">
+        <section class="panel">
+          <h3 class="panel-title">01 / Team setup</h3>
+          <div class="field"><label for="team-list">Team names · one per line</label><textarea id="team-list" placeholder="Team name one&#10;Team name two&#10;Team name three&#10;Team name four"></textarea></div>
+          <div class="hint" style="margin:-4px 0 14px">Duplicate names are ignored. A bracket rebuild replaces the current tournament and results.</div>
+          <div class="actions"><button class="button primary" id="generate-btn">Generate / rebuild bracket</button><button class="button" id="demo-btn" type="button">Load demo teams</button><button class="button" id="export-btn" type="button">Export state JSON</button><button class="button" id="import-btn" type="button">Import state JSON</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+          <div class="divider"></div>
+          <button class="button danger" id="reset-btn" type="button">Reset tournament data</button>
+          <p class="hint" style="margin:10px 0 0">Reset clears all teams, matches, scores and toss results stored for this site in this browser.</p>
+        </section>
+
+        <section class="panel scoring-launch-panel">
+          <h3 class="panel-title">02 / Match scoring</h3>
+          <div class="field"><label for="match-select">Select match</label><select id="match-select"><option value="">Generate a bracket first</option></select></div>
+          <div id="selected-match-info" class="notice" style="margin-bottom:14px">No match selected.</div>
+          <div class="match-total-preview" id="match-total-preview">
+            <div><small>TEAM A TOTAL</small><strong id="score-a-preview">0</strong></div>
+            <span>VS</span>
+            <div><small>TEAM B TOTAL</small><strong id="score-b-preview">0</strong></div>
+          </div>
+          <div class="actions" style="margin-top:14px"><button class="button primary" id="open-scoring-btn" type="button">Map vote → Score ↗</button><button class="button" id="set-live-btn" type="button">Set as live</button></div>
+          <p class="hint" style="margin:12px 0 0">Use the scoring menu to allocate action-based points. The two-game match swaps Killer and Survivor roles. Survivor points cap at 18 per game and Killer points cap at 19 per game.</p>
+          <div id="feedback" class="hint" role="status" aria-live="polite" style="margin-top:12px"></div>
+        </section>
+      </div>
+
+      <section class="panel" style="min-width:0">
+        <div class="section-heading"><div><h3 class="panel-title" style="margin-bottom:5px">03 / Tournament bracket</h3><p class="hint" style="margin:0">Choose Map vote → Score to run the toss and map bans before opening point allocation.</p></div><span class="status pending" id="bracket-status">Not generated</span></div>
+        <div id="bracket-view"><div class="empty"><h3>NO BRACKET GENERATED</h3>Enter your participating teams on the left, then generate the bracket.</div></div>
+      </section>
+    </div>
+    <footer class="footer"><span>Private control panel</span><span>Coin toss → map veto → point allocation</span></footer>
+  </main>
+  <div class="scoring-backdrop" id="scoring-modal" hidden>
+    <section class="scoring-modal" role="dialog" aria-modal="true" aria-labelledby="scoring-modal-title">
+      <div id="scoring-modal-content"></div>
+    </section>
+  </div>
+
+</body>
+</html>

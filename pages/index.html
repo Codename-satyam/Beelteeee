@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070709"><title>The Entity Championship</title>
+  <link rel="stylesheet" href="../shared/shared.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./index.html"><div class="brand-mark"><span>✦</span></div><div><div class="eyebrow">Dead by Daylight · Tournament toolkit</div><h1>The Entity Championship</h1></div></a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="./index.html" class="active">Home</a><a href="./live.html">Live screen</a><a href="./toss.html">Map voting</a><a href="./bracket.html">Bracket control</a><a href="./bracket-screen.html">Bracket screen</a>
+      </nav>
+    </header>
+    <section class="hero">
+      <div class="eyebrow">A stripped-back tournament setup</div>
+      <h2>Enter the fog.<span>Own the match.</span></h2>
+      <p>A stripped-back tournament toolkit using plain HTML, CSS, JavaScript and local JSON. Manage a bracket, vote on the map, allocate points and show the live scoreboard in real time between two streamers.</p>
+      <div class="actions"><a class="button primary" href="./bracket.html">Open tournament control →</a><a class="button" href="./live.html">Preview live screen</a><a class="button" href="./bracket-screen.html">Bracket screen</a></div>
+    </section>
+    <section class="feature-grid">
+      <a class="feature" href="./live.html"><div class="number">01 // BROADCAST</div><h3>Live Scoreboard</h3><p>Large team names, live points, round status, toss details and recent results. Add <span class="mono">?overlay=1</span> for a compact OBS-style overlay.</p></a>
+      <a class="feature" href="./toss.html"><div class="number">02 // MAP VOTE</div><h3>Toss & Map Voting</h3><p>Flip a coin to determine who bans first, then alternate map bans until one realm remains.</p></a>
+      <a class="feature" href="./bracket.html"><div class="number">03 // MATCH OPS</div><h3>Bracket & Point Allocation</h3><p>Build the tournament bracket, assign in-game points, complete matches and automatically advance winners.</p></a>
+    </section>
+    <div class="divider"></div>
+    <div class="notice"><strong>Storage note:</strong> map names load from <code>data/maps.json</code> (a built-in list is used if it is missing). With Supabase configured in <code>shared/supabase-config.js</code>, both streamers sign in on the control pages and every change syncs live to all screens. Without it, state stays in this browser; use Export/Import State JSON to move it.</div>
+    <footer class="footer"><span>The Entity Championship</span><span>Minimal build · Static Vercel deploy</span></footer>
+  </main>
+</body>
+</html>
