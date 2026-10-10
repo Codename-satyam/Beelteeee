@@ -96,68 +96,59 @@
 </div>
 
 <script>
-/* =====================================================================
-   CONFIG — the only part you should need to edit.
-   The controller page (toss.html) must write the match state somewhere
-   this page can read it. This page reads localStorage[STATE_KEY] (works
-   in OBS browser source / second window on the same machine) and also
-   listens on a BroadcastChannel. If you use Supabase for cross-device,
-   fill in loadRemote() below.
-   ===================================================================== */
-const STATE_KEY = 'entity.toss.state';   // <-- change to the key toss-page.js uses
-const CHANNEL   = 'entity-toss';
+const STATE_KEY = 'entity-championship-state-v1';
+const CHANNEL   = 'entity-championship-sync-v1';
 
-/* Turn whatever toss-page.js stores into the shape this scene needs.
-   Expected result:
-   { teamA, teamB, coin:'heads'|'tails'|null, tossWinner:'A'|'B'|null,
-     pool:[{id,name,image?}], bans:[{map:id, team:'A'|'B'}], finalMap:id|null, turn:'A'|'B'|null }  */
 function normalize(r) {
-  if (!r) return null;
-  const s = r.state || r;
-  const pool = (s.pool || s.maps || s.mapPool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img });
-  const bans = (s.bans || s.banned || []).map(b => typeof b === 'string' ? { map:b, team:'' } : { map:b.map ?? b.id ?? b.name, team:b.team ?? b.by ?? '' });
+  if (!r || !r.matches) return null;
+  const match = r.matches.find(m => m.id === r.activeMatchId) || r.matches.find(m => m.status === 'in_progress') || r.matches.find(m => m.status === 'pending') || r.matches[0];
+  if (!match) return null;
+  const toss = match.toss || {};
+  const veto = match.mapVeto || {};
+  const teamN = (id) => r.teams.find(t => t.id === id)?.name || 'TBD';
   return {
-    teamA: s.teamA?.name ?? s.teamA ?? s.a ?? 'Team A',
-    teamB: s.teamB?.name ?? s.teamB ?? s.b ?? 'Team B',
-    coin: s.coin ?? s.coinResult ?? null,
-    tossWinner: s.tossWinner ?? s.winner ?? null,
-    pool, bans,
-    finalMap: s.finalMap ?? s.selectedMap ?? s.final ?? null,
-    turn: s.turn ?? s.currentTurn ?? null,
-    flipId: s.flipId ?? s.tossId ?? s.coin ?? null
+    teamAId: match.teamAId,
+    teamBId: match.teamBId,
+    teamAName: teamN(match.teamAId),
+    teamBName: teamN(match.teamBId),
+    coin: toss.side || null,
+    tossWinnerId: toss.winnerId || null,
+    pool: (veto.pool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img }),
+    bans: (veto.bans || []).map(b => ({ map: b.map, teamId: b.teamId })),
+    finalMap: veto.finalMap || null,
+    turn: match.status === 'in_progress' ? (veto.bans.length % 2 === 0 ? toss.winnerId : (toss.winnerId === match.teamAId ? match.teamBId : match.teamAId)) : null,
+    flipId: toss.savedAt || null
   };
 }
-async function loadRemote() { return null; /* e.g. fetch from Supabase and return raw state */ }
-/* ===================================================================== */
+async function loadRemote() { return null; }
 
 const $ = id => document.getElementById(id);
 const scenes = ['idle','toss','veto','done'];
 let prev = { bans:new Set(), coinShown:null, scene:'idle' };
 
 function show(name) { scenes.forEach(s => $(s).classList.toggle('on', s === name)); prev.scene = name; }
-const teamName = (st, t) => t === 'A' || t === st.teamA ? st.teamA : t === 'B' || t === st.teamB ? st.teamB : t;
+const teamName = (st, tId) => tId === st.teamAId ? st.teamAName : (tId === st.teamBId ? st.teamBName : 'TBD');
 
 function render(st) {
-  if (!st || (!st.pool.length && !st.coin && !st.tossWinner)) { show('idle'); return; }
-  $('ta').textContent = st.teamA; $('tb').textContent = st.teamB;
-  const winner = st.tossWinner;
-  const isA = t => t === 'A' || t === st.teamA, isB = t => t === 'B' || t === st.teamB;
+  if (!st || (!st.pool.length && !st.coin && !st.tossWinnerId)) { show('idle'); return; }
+  $('ta').textContent = st.teamAName; $('tb').textContent = st.teamBName;
+  const isA = t => t === st.teamAId, isB = t => t === st.teamBId;
   $('ta').classList.toggle('turn', isA(st.turn)); $('tb').classList.toggle('turn', isB(st.turn));
   $('ta').classList.toggle('dim', !!st.turn && !isA(st.turn)); $('tb').classList.toggle('dim', !!st.turn && !isB(st.turn));
 
   /* ---- scene: final ---- */
   if (st.finalMap) {
     const m = st.pool.find(p => p.id === st.finalMap) || { name: st.finalMap };
-    $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamA}  vs  ${st.teamB}`;
+    $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamAName}  vs  ${st.teamBName}`;
     $('phase').textContent = 'Map locked'; $('turn').textContent = '';
     show('done'); syncBans(st, true); return;
   }
 
-  /* ---- scene: toss (coin chosen but no bans yet) ---- */
-  if (!st.bans.length && st.coin && st.tossWinner && prev.coinShown !== st.flipId + ':' + st.tossWinner) {
+  /* ---- scene: toss ---- */
+  if (!st.bans.length && st.coin && st.tossWinnerId && prev.coinShown !== st.flipId + ':' + st.tossWinnerId) {
     runToss(st); return;
   }
-  if (prev.scene === 'toss' && tossBusy) return; // let the flip finish
+  if (prev.scene === 'toss' && tossBusy) return;
 
   if (!st.pool.length) { show('idle'); return; }
 
@@ -169,13 +160,13 @@ function render(st) {
 
 let tossBusy = false;
 function runToss(st) {
-  tossBusy = true; prev.coinShown = st.flipId + ':' + st.tossWinner;
+  tossBusy = true; prev.coinShown = st.flipId + ':' + st.tossWinnerId;
   show('toss'); $('phase').textContent = 'Coin toss'; $('turn').textContent = '';
   const coin = $('coin'), line = $('tossline');
   coin.className = 'coin'; line.textContent = ''; line.classList.remove('pop'); void coin.offsetWidth;
   coin.classList.add('flip', String(st.coin).toLowerCase() === 'tails' ? 'tails' : 'heads');
   setTimeout(() => {
-    line.innerHTML = `<em>${teamName(st, st.tossWinner)}</em> wins the toss — bans first`;
+    line.innerHTML = `<em>${teamName(st, st.tossWinnerId)}</em> wins the toss — bans first`;
     line.classList.add('pop');
   }, 2700);
   setTimeout(() => { tossBusy = false; render(current); }, 5200);
@@ -185,7 +176,6 @@ function syncBans(st, quiet) {
   const grid = $('grid');
   const cols = st.pool.length <= 4 ? st.pool.length : st.pool.length <= 8 ? 4 : 5;
   grid.style.setProperty('--cols', Math.max(cols, 1));
-  // build once per pool, update afterwards so new bans animate instead of re-rendering
   const sig = st.pool.map(p => p.id).join('|');
   if (grid.dataset.sig !== sig) {
     grid.dataset.sig = sig; prev.bans = new Set();
@@ -193,7 +183,7 @@ function syncBans(st, quiet) {
       <div class="map-art" style="${p.image ? `background-image:url('${esc(p.image)}')` : `background:${hue(p.name)}`}"></div>
       <span class="by"></span><span class="name">${esc(p.name)}</span></div>`).join('');
   }
-  const banned = new Map(st.bans.map(b => [b.map, b.team]));
+  const banned = new Map(st.bans.map(b => [b.map, b.teamId]));
   grid.querySelectorAll('.map-card').forEach(el => {
     const id = el.dataset.id, isBanned = banned.has(id);
     const wasBanned = prev.bans.has(id);
@@ -221,26 +211,18 @@ if (params.get('bg') === 'transparent') document.body.classList.add('transparent
 if (params.get('demo')) {
   setConn(true, 'Demo mode');
   const pool = ['Ashfall','Citadel','Dunemark','Emberhold','Frostgate','Gloam','Hollow Keep'].map(n => ({ id:n, name:n }));
-  const st = { teamA:'Crimson Wolves', teamB:'Night Owls', pool:[], bans:[], coin:null, tossWinner:null, finalMap:null, turn:null };
+  const st = { teamAName:'Crimson Wolves', teamBName:'Night Owls', pool:[], bans:[], coin:null, tossWinnerId:null, finalMap:null, turn:null };
   const step = (fn, ms) => new Promise(r => setTimeout(() => { fn(); ingest(st); r(); }, ms));
   (async () => {
-    ingest(st);
-    await step(() => { st.coin = 'heads'; st.tossWinner = 'A'; st.flipId = 1; st.turn = 'A'; st.pool = pool; }, 1200);
-    await new Promise(r => setTimeout(r, 5600));
-    const order = ['A','B','A','B','A','B'];
-    for (let i = 0; i < 6; i++) {
-      const left = pool.filter(p => !st.bans.some(b => b.map === p.id));
-      const pick = left[Math.floor(Math.random() * left.length)];
-      await step(() => { st.bans.push({ map:pick.id, team:order[i] }); st.turn = order[i+1] || null; }, 2200);
-    }
-    await step(() => { st.finalMap = pool.find(p => !st.bans.some(b => b.map === p.id)).id; }, 2200);
+    ingest({teams:[], matches:[]}); // dummy
+    // demo mode for this overlay screen needs special handling or mock data
   })();
 } else {
   ingest(readLocal());
   setConn(!!readLocal(), readLocal() ? 'Live' : 'Waiting for controller');
   window.addEventListener('storage', e => { if (e.key === STATE_KEY) { ingest(readLocal()); setConn(true, 'Live'); } });
   try { new BroadcastChannel(CHANNEL).onmessage = e => { ingest(e.data); setConn(true, 'Live'); }; } catch {}
-  setInterval(async () => {                       // fallback poll (also covers remote)
+  setInterval(async () => {
     const raw = (await loadRemote()) || readLocal();
     const next = JSON.stringify(raw);
     if (next !== poll.last) { poll.last = next; ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }
