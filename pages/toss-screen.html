@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Veto — Live Scene — The Entity Championship</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ban-slash.css">
+<style>
+  :root { --bg:#070709; --panel:#121216; --line:#26262d; --text:#f2f2f4; --dim:#8b8b96; --red:#ff2a3d; --gold:#f5c542; }
+  * { box-sizing:border-box; margin:0 }
+  html,body { height:100%; background:var(--bg); color:var(--text); font-family:Barlow,system-ui,sans-serif; overflow:hidden }
+  body.transparent { background:transparent } /* add ?bg=transparent for OBS overlays */
+  .stage { height:100%; display:grid; grid-template-rows:auto 1fr auto; padding:3vh 3.5vw; gap:2.5vh;
+    background:radial-gradient(ellipse at 50% -10%, #2a0a10 0%, transparent 60%) }
+  .head { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:2vw }
+  .team { font:800 clamp(28px,4.6vw,76px)/1 'Barlow Condensed',sans-serif; letter-spacing:.01em; transition:opacity .4s, color .4s }
+  .team.b { text-align:right }
+  .team.turn { color:var(--red) }
+  .team.dim { opacity:.4 }
+  .mid { text-align:center; font:600 clamp(14px,1.6vw,24px) Barlow; color:var(--dim); min-width:18vw }
+  .mid strong { display:block; color:var(--text); font:700 clamp(18px,2.2vw,34px) 'Barlow Condensed'; margin-top:.3em }
+
+  .body { position:relative; min-height:0 }
+  .scene { position:absolute; inset:0; display:none }
+  .scene.on { display:flex }
+
+  /* ---------- toss ---------- */
+  #toss { flex-direction:column; align-items:center; justify-content:center; gap:4vh; perspective:1200px }
+  .coin { width:min(30vh,28vw); aspect-ratio:1; position:relative; transform-style:preserve-3d }
+  .coin i { position:absolute; inset:0; border-radius:50%; display:grid; place-items:center; backface-visibility:hidden;
+    font:800 clamp(30px,6vh,64px) 'Barlow Condensed'; color:#2b1d00;
+    background:radial-gradient(circle at 35% 30%, #fff1b0, var(--gold) 45%, #9b7312); border:6px solid #c99a1c;
+    box-shadow:inset 0 0 0 8px rgba(255,255,255,.18), 0 20px 60px rgba(245,197,66,.25) }
+  .coin i:last-child { transform:rotateY(180deg) }
+  .coin.flip { animation:flip 2.6s cubic-bezier(.2,.7,.2,1) forwards }
+  .coin.heads { --end:1800deg } .coin.tails { --end:1980deg }
+  @keyframes flip { 0% { transform:translateY(0) rotateY(0) } 45% { transform:translateY(-22vh) rotateY(calc(var(--end)*.6)) } 100% { transform:translateY(0) rotateY(var(--end)) } }
+  .toss-line { font:800 clamp(30px,6vh,80px) 'Barlow Condensed'; text-align:center; min-height:1.2em }
+  .toss-line em { font-style:normal; color:var(--red) }
+  .toss-line.pop { animation:pop .5s cubic-bezier(.2,1.4,.4,1) }
+  @keyframes pop { from { transform:scale(.7); opacity:0 } to { transform:scale(1); opacity:1 } }
+
+  /* ---------- veto ---------- */
+  #veto { flex-direction:column; gap:2vh }
+  .grid { flex:1; min-height:0; display:grid; gap:1.4vw; grid-template-columns:repeat(var(--cols,4),1fr); align-content:center }
+  .map-card { position:relative; overflow:hidden; border:2px solid var(--line); background:var(--panel); aspect-ratio:16/10;
+    display:flex; align-items:flex-end; transition:border-color .3s, transform .3s }
+  .map-card .map-art { position:absolute; inset:0; background-size:cover; background-position:center; transition:filter .5s ease .25s }
+  .map-card .map-art::after { content:""; position:absolute; inset:0; background:linear-gradient(transparent 40%, rgba(0,0,0,.85)) }
+  .map-card .name { position:relative; padding:1.2vh 1.2vw; font:800 clamp(18px,2.6vw,42px)/1 'Barlow Condensed'; letter-spacing:.02em }
+  .map-card .by { position:absolute; top:1vh; left:1vw; font:700 clamp(11px,1.1vw,16px) 'Barlow Condensed'; letter-spacing:.12em; color:var(--red);
+    background:rgba(0,0,0,.65); padding:.3em .7em; display:none }
+  .map-card.banned { border-color:#3a1218 }
+  .map-card.banned .name { color:var(--dim) }
+  .map-card.banned .by { display:block }
+  .map-card.final { border-color:var(--gold); transform:scale(1.04) }
+
+  /* ---------- final ---------- */
+  #done { flex-direction:column; align-items:center; justify-content:center; gap:2vh; text-align:center }
+  #done .label { font:600 clamp(16px,2vw,28px) Barlow; color:var(--dim) }
+  #done .big { font:800 clamp(64px,16vh,200px)/.95 'Barlow Condensed'; color:var(--gold); animation:pop .7s cubic-bezier(.2,1.4,.4,1) }
+  #done .vs { font:700 clamp(20px,3vw,44px) 'Barlow Condensed' }
+
+  .foot { display:flex; justify-content:space-between; color:var(--dim); font:600 clamp(11px,1.1vw,15px) Barlow }
+  .dot { display:inline-block; width:.6em; height:.6em; border-radius:50%; background:#555; margin-right:.5em }
+  .dot.live { background:var(--red); animation:blink 1.4s infinite }
+  @keyframes blink { 50% { opacity:.25 } }
+  @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-delay:0s !important } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="head">
+    <div class="team a" id="ta">Team A</div>
+    <div class="mid"><span id="phase">Waiting for match</span><strong id="turn"></strong></div>
+    <div class="team b" id="tb">Team B</div>
+  </div>
+
+  <div class="body">
+    <section class="scene on" id="idle"><div class="toss-line" style="margin:auto;color:var(--dim)">Waiting for the match ceremony to start…</div></section>
+    <section class="scene" id="toss">
+      <div class="coin" id="coin"><i>HEADS</i><i>TAILS</i></div>
+      <div class="toss-line" id="tossline"></div>
+    </section>
+    <section class="scene" id="veto"><div class="grid" id="grid"></div></section>
+    <section class="scene" id="done">
+      <div class="label">The realm has been decided</div>
+      <div class="big" id="finalmap"></div>
+      <div class="vs" id="finalvs"></div>
+    </section>
+  </div>
+
+  <div class="foot"><span><span class="dot" id="dot"></span><span id="conn">Not connected</span></span><span>The Entity Championship</span></div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG — the only part you should need to edit.
+   The controller page (toss.html) must write the match state somewhere
+   this page can read it. This page reads localStorage[STATE_KEY] (works
+   in OBS browser source / second window on the same machine) and also
+   listens on a BroadcastChannel. If you use Supabase for cross-device,
+   fill in loadRemote() below.
+   ===================================================================== */
+const STATE_KEY = 'entity.toss.state';   // <-- change to the key toss-page.js uses
+const CHANNEL   = 'entity-toss';
+
+/* Turn whatever toss-page.js stores into the shape this scene needs.
+   Expected result:
+   { teamA, teamB, coin:'heads'|'tails'|null, tossWinner:'A'|'B'|null,
+     pool:[{id,name,image?}], bans:[{map:id, team:'A'|'B'}], finalMap:id|null, turn:'A'|'B'|null }  */
+function normalize(r) {
+  if (!r) return null;
+  const s = r.state || r;
+  const pool = (s.pool || s.maps || s.mapPool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img });
+  const bans = (s.bans || s.banned || []).map(b => typeof b === 'string' ? { map:b, team:'' } : { map:b.map ?? b.id ?? b.name, team:b.team ?? b.by ?? '' });
+  return {
+    teamA: s.teamA?.name ?? s.teamA ?? s.a ?? 'Team A',
+    teamB: s.teamB?.name ?? s.teamB ?? s.b ?? 'Team B',
+    coin: s.coin ?? s.coinResult ?? null,
+    tossWinner: s.tossWinner ?? s.winner ?? null,
+    pool, bans,
+    finalMap: s.finalMap ?? s.selectedMap ?? s.final ?? null,
+    turn: s.turn ?? s.currentTurn ?? null,
+    flipId: s.flipId ?? s.tossId ?? s.coin ?? null
+  };
+}
+async function loadRemote() { return null; /* e.g. fetch from Supabase and return raw state */ }
+/* ===================================================================== */
+
+const $ = id => document.getElementById(id);
+const scenes = ['idle','toss','veto','done'];
+let prev = { bans:new Set(), coinShown:null, scene:'idle' };
+
+function show(name) { scenes.forEach(s => $(s).classList.toggle('on', s === name)); prev.scene = name; }
+const teamName = (st, t) => t === 'A' || t === st.teamA ? st.teamA : t === 'B' || t === st.teamB ? st.teamB : t;
+
+function render(st) {
+  if (!st || (!st.pool.length && !st.coin && !st.tossWinner)) { show('idle'); return; }
+  $('ta').textContent = st.teamA; $('tb').textContent = st.teamB;
+  const winner = st.tossWinner;
+  const isA = t => t === 'A' || t === st.teamA, isB = t => t === 'B' || t === st.teamB;
+  $('ta').classList.toggle('turn', isA(st.turn)); $('tb').classList.toggle('turn', isB(st.turn));
+  $('ta').classList.toggle('dim', !!st.turn && !isA(st.turn)); $('tb').classList.toggle('dim', !!st.turn && !isB(st.turn));
+
+  /* ---- scene: final ---- */
+  if (st.finalMap) {
+    const m = st.pool.find(p => p.id === st.finalMap) || { name: st.finalMap };
+    $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamA}  vs  ${st.teamB}`;
+    $('phase').textContent = 'Map locked'; $('turn').textContent = '';
+    show('done'); syncBans(st, true); return;
+  }
+
+  /* ---- scene: toss (coin chosen but no bans yet) ---- */
+  if (!st.bans.length && st.coin && st.tossWinner && prev.coinShown !== st.flipId + ':' + st.tossWinner) {
+    runToss(st); return;
+  }
+  if (prev.scene === 'toss' && tossBusy) return; // let the flip finish
+
+  if (!st.pool.length) { show('idle'); return; }
+
+  /* ---- scene: veto ---- */
+  $('phase').textContent = 'Map veto';
+  $('turn').textContent = st.turn ? `${teamName(st, st.turn)} to ban` : '';
+  show('veto'); syncBans(st);
+}
+
+let tossBusy = false;
+function runToss(st) {
+  tossBusy = true; prev.coinShown = st.flipId + ':' + st.tossWinner;
+  show('toss'); $('phase').textContent = 'Coin toss'; $('turn').textContent = '';
+  const coin = $('coin'), line = $('tossline');
+  coin.className = 'coin'; line.textContent = ''; line.classList.remove('pop'); void coin.offsetWidth;
+  coin.classList.add('flip', String(st.coin).toLowerCase() === 'tails' ? 'tails' : 'heads');
+  setTimeout(() => {
+    line.innerHTML = `<em>${teamName(st, st.tossWinner)}</em> wins the toss — bans first`;
+    line.classList.add('pop');
+  }, 2700);
+  setTimeout(() => { tossBusy = false; render(current); }, 5200);
+}
+
+function syncBans(st, quiet) {
+  const grid = $('grid');
+  const cols = st.pool.length <= 4 ? st.pool.length : st.pool.length <= 8 ? 4 : 5;
+  grid.style.setProperty('--cols', Math.max(cols, 1));
+  // build once per pool, update afterwards so new bans animate instead of re-rendering
+  const sig = st.pool.map(p => p.id).join('|');
+  if (grid.dataset.sig !== sig) {
+    grid.dataset.sig = sig; prev.bans = new Set();
+    grid.innerHTML = st.pool.map(p => `<div class="map-card" data-id="${esc(p.id)}">
+      <div class="map-art" style="${p.image ? `background-image:url('${esc(p.image)}')` : `background:${hue(p.name)}`}"></div>
+      <span class="by"></span><span class="name">${esc(p.name)}</span></div>`).join('');
+  }
+  const banned = new Map(st.bans.map(b => [b.map, b.team]));
+  grid.querySelectorAll('.map-card').forEach(el => {
+    const id = el.dataset.id, isBanned = banned.has(id);
+    const wasBanned = prev.bans.has(id);
+    el.classList.toggle('banned', isBanned);
+    el.classList.toggle('final', id === st.finalMap);
+    el.classList.remove('just-banned');
+    if (isBanned) el.querySelector('.by').textContent = 'BANNED · ' + teamName(st, banned.get(id));
+    if (isBanned && !wasBanned && !quiet) { void el.offsetWidth; el.classList.add('just-banned'); }
+  });
+  prev.bans = new Set(banned.keys());
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hue = n => { let h = 0; for (const c of String(n)) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(135deg,hsl(${h} 45% 22%),hsl(${(h+50)%360} 55% 12%))`; };
+
+/* ---------- data wiring ---------- */
+let current = null;
+function ingest(raw) { current = normalize(raw); render(current); }
+function readLocal() { try { return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } }
+function setConn(ok, txt) { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; }
+
+const params = new URLSearchParams(location.search);
+if (params.get('bg') === 'transparent') document.body.classList.add('transparent');
+
+if (params.get('demo')) {
+  setConn(true, 'Demo mode');
+  const pool = ['Ashfall','Citadel','Dunemark','Emberhold','Frostgate','Gloam','Hollow Keep'].map(n => ({ id:n, name:n }));
+  const st = { teamA:'Crimson Wolves', teamB:'Night Owls', pool:[], bans:[], coin:null, tossWinner:null, finalMap:null, turn:null };
+  const step = (fn, ms) => new Promise(r => setTimeout(() => { fn(); ingest(st); r(); }, ms));
+  (async () => {
+    ingest(st);
+    await step(() => { st.coin = 'heads'; st.tossWinner = 'A'; st.flipId = 1; st.turn = 'A'; st.pool = pool; }, 1200);
+    await new Promise(r => setTimeout(r, 5600));
+    const order = ['A','B','A','B','A','B'];
+    for (let i = 0; i < 6; i++) {
+      const left = pool.filter(p => !st.bans.some(b => b.map === p.id));
+      const pick = left[Math.floor(Math.random() * left.length)];
+      await step(() => { st.bans.push({ map:pick.id, team:order[i] }); st.turn = order[i+1] || null; }, 2200);
+    }
+    await step(() => { st.finalMap = pool.find(p => !st.bans.some(b => b.map === p.id)).id; }, 2200);
+  })();
+} else {
+  ingest(readLocal());
+  setConn(!!readLocal(), readLocal() ? 'Live' : 'Waiting for controller');
+  window.addEventListener('storage', e => { if (e.key === STATE_KEY) { ingest(readLocal()); setConn(true, 'Live'); } });
+  try { new BroadcastChannel(CHANNEL).onmessage = e => { ingest(e.data); setConn(true, 'Live'); }; } catch {}
+  setInterval(async () => {                       // fallback poll (also covers remote)
+    const raw = (await loadRemote()) || readLocal();
+    const next = JSON.stringify(raw);
+    if (next !== poll.last) { poll.last = next; ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }
+  }, 1000);
+  var poll = { last: JSON.stringify(readLocal()) };
+}
+</script>
+</body>
+</html>
