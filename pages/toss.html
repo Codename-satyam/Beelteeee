@@ -7,6 +7,22 @@
   <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="../shared/shared.js"></script>
   <script defer src="../shared/toss-page.js"></script>
+  <style id="ban-slash-admin">
+    /* Banned maps on the admin page: dimmed, X-slashed, tagged with who banned them. */
+    .lp-ban{position:relative;overflow:hidden;box-shadow:inset 0 0 0 999px rgba(0,0,0,.5)}
+    .lp-ban>*:not(.lp-ban-tag){filter:grayscale(1) brightness(.6);transition:filter .5s ease .25s}
+    .lp-ban::before,.lp-ban::after{content:"";position:absolute;z-index:3;pointer-events:none;height:6px;width:var(--len,140%);left:calc(50% - var(--len,140%)/2);top:calc(50% - 3px);
+      background:linear-gradient(90deg,transparent,#ff2a3d 10%,#ff2a3d 90%,transparent);box-shadow:0 0 16px 2px rgba(255,42,61,.75)}
+    .lp-ban::before{transform:rotate(var(--ang,30deg))}
+    .lp-ban::after{transform:rotate(calc(var(--ang,30deg) * -1))}
+    .lp-ban-tag{position:absolute;top:8px;left:8px;z-index:4;padding:3px 8px;background:rgba(0,0,0,.78);border:1px solid #ff2a3d;color:#ff7581;font:800 .62rem/1 var(--mono,monospace);letter-spacing:.12em}
+    .lp-ban-new::before{animation:lp-sl .32s cubic-bezier(.2,.9,.2,1) both}
+    .lp-ban-new::after{animation:lp-sl .32s cubic-bezier(.2,.9,.2,1) .16s both}
+    .lp-ban-new{animation:lp-shake .35s ease .3s}
+    @keyframes lp-sl{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+    @keyframes lp-shake{0%,100%{translate:0}25%{translate:-5px 2px}60%{translate:4px -2px}}
+    @media (prefers-reduced-motion:reduce){.lp-ban-new,.lp-ban-new::before,.lp-ban-new::after{animation:none!important}}
+  </style>
 </head>
 <body data-controller>
   <main class="shell ceremony-shell">
@@ -32,5 +48,71 @@
 
     <footer class="footer"><span>THE ENTITY CHAMPIONSHIP // MATCHDAY OPERATIONS</span><span>Every map ban and the final map are saved to this browser.</span></footer>
   </main>
+  <script id="ban-slash-admin-js">
+    /* Finds each map card in #wizard by its map name, reads the banned maps from the saved match state,
+       and slashes the banned ones. Works without knowing toss-page.js's markup. */
+    (() => {
+      const KEY = 'entity-championship-state-v1';
+      const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const nm = (x) => String(x && typeof x === 'object' ? (x.name ?? x.id ?? '') : (x ?? '')).trim();
+      const seen = new Map();   // matchId -> banned maps already shown (so only NEW bans animate)
+      let timer;
+
+      function state() {
+        let r; try { r = JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
+        if (!r || !Array.isArray(r.matches)) return null;
+        const m = r.matches.find((x) => x.id === r.activeMatchId) || r.matches.find((x) => x.status === 'in_progress') || r.matches.find((x) => x.status === 'pending') || r.matches[0];
+        if (!m) return null;
+        const v = m.mapVeto || {};
+        return { id: m.id, teams: r.teams || [],
+          pool: (v.pool || []).map(nm).filter(Boolean),
+          bans: (Array.isArray(v.bans) ? v.bans : []).map((b) => ({ map: nm(b && b.map !== undefined ? b.map : b), teamId: b && b.teamId })) };
+      }
+
+      function apply() {
+        const wiz = document.getElementById('wizard'), st = state();
+        if (!wiz || !st || !st.pool.length) return;
+        const poolN = new Map(st.pool.map((n) => [norm(n), n]));
+        const banned = new Map(st.bans.map((b) => [norm(b.map), b.teamId]));
+        if (!seen.has(st.id)) seen.set(st.id, new Set(banned.keys()));   // first look: existing bans show instantly
+        const shown = seen.get(st.id);
+
+        const nameEls = [];
+        wiz.querySelectorAll('*').forEach((el) => {
+          if (el.closest('.lp-ban-tag') || el.children.length > 3) return;
+          const k = norm(el.textContent); if (poolN.has(k)) nameEls.push({ el, k });
+        });
+        const namesIn = (node) => new Set(nameEls.filter((x) => node.contains(x.el)).map((x) => x.k)).size;
+
+        const done = new Set();
+        nameEls.forEach(({ el, k }) => {
+          if (!banned.has(k)) return;
+          let c = el;                                    // climb to the card: the largest box holding only this map's name
+          while (c.parentElement && c.parentElement !== wiz && namesIn(c.parentElement) === 1) c = c.parentElement;
+          if (done.has(c)) return; done.add(c);
+          const r = c.getBoundingClientRect();
+          if (r.width < 90 || r.height < 50 || r.height > innerHeight * 0.7) return;   // skip log chips / whole-page wrappers
+          c.classList.add('lp-ban');
+          c.style.setProperty('--ang', Math.atan2(r.height, r.width) * 180 / Math.PI + 'deg');
+          c.style.setProperty('--len', Math.hypot(r.width, r.height) + 24 + 'px');
+          if (!c.querySelector(':scope > .lp-ban-tag')) {
+            const team = (st.teams.find((t) => t.id === banned.get(k)) || {}).name;
+            const tag = document.createElement('span'); tag.className = 'lp-ban-tag'; tag.textContent = 'BANNED' + (team ? ' · ' + team : '');
+            c.appendChild(tag);
+          }
+          if (!shown.has(k)) { shown.add(k); c.classList.add('lp-ban-new'); }
+        });
+      }
+
+      const queue = () => { clearTimeout(timer); timer = setTimeout(apply, 40); };
+      window.addEventListener('load', () => {
+        const wiz = document.getElementById('wizard');
+        if (wiz) new MutationObserver(queue).observe(wiz, { childList: true, subtree: true });
+        window.addEventListener('storage', queue); window.addEventListener('resize', queue);
+        setInterval(apply, 800);                          // safety net if a re-render lands before the state is saved
+        apply();
+      }, { once: true });
+    })();
+  </script>
 </body>
 </html>
