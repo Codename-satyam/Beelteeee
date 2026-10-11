@@ -575,14 +575,22 @@
         })());
         return cache.get(team.file);
       }
+      // Other scripts on the page (e.g. live-page.js) may also write to these <img> elements and set a wrong path.
+      // Once we know the working URL we "lock" it: if anything else changes src, we put the good one back.
+      function lock(img) {
+        if (img._locked) return; img._locked = true;
+        new MutationObserver(() => { const g = img.dataset.good; if (g && img.getAttribute('src') !== g) { console.warn('[logos] src was overwritten with', img.getAttribute('src'), '— restoring', g); img.setAttribute('src', g); } })
+          .observe(img, { attributes: true, attributeFilter: ['src'] });
+      }
       async function setImg(img, team, done) {
         if (!img) return;
-        if (!team) { img.hidden = true; img.removeAttribute('src'); img.dataset.want = ''; if (done) done(false); return; }
+        if (!team) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); img.dataset.want = ''; if (done) done(false); return; }
         img.dataset.want = team.file;
         const u = await resolveLogo(team);
         if (img.dataset.want !== team.file) return;          // the name changed while we were loading
-        if (!u) { img.hidden = true; if (done) done(false); return; }
-        if (img.getAttribute('src') !== u) img.src = u;
+        if (!u) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); if (done) done(false); return; }
+        img.dataset.good = u; lock(img);
+        if (img.getAttribute('src') !== u) img.setAttribute('src', u);
         img.hidden = false; if (done) done(true);
       }
       function watchText(id, fn) {
@@ -604,6 +612,13 @@
       watchText('toss-winner-name', (team) => setImg($('toss-img'), team));
       watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok) $('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
 
+
+      if (new URLSearchParams(location.search).get('logos') === 'debug') {
+        const box = Object.assign(document.createElement('pre'), { style: 'position:fixed;top:8px;left:8px;z-index:99999;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;max-width:90vw;white-space:pre-wrap' });
+        document.body.appendChild(box);
+        const show = () => { box.textContent = ['team-a-img', 'team-b-img', 'toss-img', 'celebration-img'].map((id) => { const i = $(id); return id + ': ' + (i ? (i.getAttribute('src') || '(no src)') + (i.complete && i.naturalWidth ? '  OK ' + i.naturalWidth + 'px' : '  NOT LOADED') : 'missing element'); }).join('\n') + '\nfolders tried: ' + LOGO_DIRS.join('  '); };
+        setInterval(show, 700); show();
+      }
       const swap = window.sideSwapStinger;   // add logos to the side-swap stinger
       window.sideSwapStinger = (a, b) => {
         setImg($('ss-a-img'), find($('team-a-name').textContent)); setImg($('ss-b-img'), find($('team-b-name').textContent));
