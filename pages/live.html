@@ -370,10 +370,6 @@
         <span>MAP <b id="selected-map">NOT SELECTED</b></span>
         <span class="winner-detail" id="winner-detail">WINNER · PENDING</span>
       </div>
-      <!-- Leaderboard embedded -->
-      <div class="scoreboard-leaderboard">
-        <iframe src="leaderboard.html" width="100%" height="400px" frameborder="0"></iframe>
-      </div>
 
       <div class="side-swap" id="side-swap" aria-hidden="true">
         <div class="ss-lane ss-a"><img class="ss-logo" id="ss-a-img" alt="" hidden><b id="ss-a-name"></b><span id="ss-a-role"></span></div>
@@ -550,7 +546,9 @@
   <script id="live-logos-js">
     (() => {
       /* ===== CONFIG ===== */
-      const LOGO_DIR = 'New Folder/';    // folder that holds the PNGs, relative to this page (case-sensitive on Vercel)
+      // Where the logos live. Tried in order until one loads (the working folder is remembered).
+      // "/Images/" = project root on the deployed site, "../Images/" = one level up from this page.
+      const LOGO_DIRS = ['/Images/', '../Images/', 'Images/', '/images/', '../images/', 'images/'];
       const TEAMS = {                    // key = a word in the team's name (any case) → logo file + accent colour (r,g,b)
         boys:     { file: 'Boys.png',     acc: '245,197,24'  },
         eternity: { file: 'eternity.png', acc: '139,123,255' },
@@ -564,12 +562,28 @@
       /* ================== */
       const $ = (id) => document.getElementById(id);
       const find = (name) => { for (const t of String(name || '').toLowerCase().split(/[^a-z0-9]+/)) if (t && TEAMS[t]) return TEAMS[t]; return null; };
-      const url = (t) => encodeURI(LOGO_DIR + t.file);
-      function setImg(img, team) {
-        if (!img) return false;
-        if (!team) { img.hidden = true; img.removeAttribute('src'); return false; }
-        if (img.getAttribute('src') !== url(team)) img.src = url(team);
-        img.hidden = false; return true;
+
+      // Tries every folder and name casing (Boys.png / boys.png / BOYS.png) until the image really loads.
+      const cache = new Map(); let goodDir = null;
+      const variants = (f) => { const b = f.replace(/\.\w+$/, ''); return [...new Set([f, b[0].toUpperCase() + b.slice(1).toLowerCase() + '.png', b.toLowerCase() + '.png', b.toUpperCase() + '.png'])]; };
+      const probe = (u) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(true); i.onerror = () => ok(false); i.src = u; });
+      function resolveLogo(team) {
+        if (!cache.has(team.file)) cache.set(team.file, (async () => {
+          for (const d of [goodDir, ...LOGO_DIRS].filter((x, i, a) => x && a.indexOf(x) === i))
+            for (const n of variants(team.file)) { const u = encodeURI(d + n); if (await probe(u)) { goodDir = d; return u; } }
+          console.warn('[logos] not found:', team.file, '— tried folders', LOGO_DIRS); return null;
+        })());
+        return cache.get(team.file);
+      }
+      async function setImg(img, team, done) {
+        if (!img) return;
+        if (!team) { img.hidden = true; img.removeAttribute('src'); img.dataset.want = ''; if (done) done(false); return; }
+        img.dataset.want = team.file;
+        const u = await resolveLogo(team);
+        if (img.dataset.want !== team.file) return;          // the name changed while we were loading
+        if (!u) { img.hidden = true; if (done) done(false); return; }
+        if (img.getAttribute('src') !== u) img.src = u;
+        img.hidden = false; if (done) done(true);
       }
       function watchText(id, fn) {
         const el = $(id); if (!el) return; let last;
@@ -579,16 +593,16 @@
 
       for (const k of ['a', 'b']) {
         const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap = $('team-' + k + '-logo');
-        img.addEventListener('error', () => { panel.classList.remove('has-logo'); console.warn('[logos] could not load', img.src); });
         watchText('team-' + k + '-name', (team) => {
-          const ok = setImg(img, team); panel.classList.toggle('has-logo', ok);
-          if (!ok) return panel.style.removeProperty('--acc-rgb');
-          panel.style.setProperty('--acc-rgb', team.acc);
-          wrap.classList.remove('logo-in'); void wrap.offsetWidth; wrap.classList.add('logo-in');
+          if (team) panel.style.setProperty('--acc-rgb', team.acc); else panel.style.removeProperty('--acc-rgb');
+          setImg(img, team, (ok) => {
+            panel.classList.toggle('has-logo', ok);
+            if (ok) { wrap.classList.remove('logo-in'); void wrap.offsetWidth; wrap.classList.add('logo-in'); }
+          });
         });
       }
       watchText('toss-winner-name', (team) => setImg($('toss-img'), team));
-      watchText('celebration-winner', (team) => { const i = $('celebration-img'); if (setImg(i, team)) i.style.setProperty('--acc-rgb', team.acc); });
+      watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok) $('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
 
       const swap = window.sideSwapStinger;   // add logos to the side-swap stinger
       window.sideSwapStinger = (a, b) => {
