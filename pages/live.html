@@ -324,6 +324,28 @@
       body.live-overlay .live-team.a.has-logo .score{left:0}body.live-overlay .live-team.b.has-logo .score{right:0}}
     @media (prefers-reduced-motion:reduce){.team-logo.logo-in{animation:none!important}}
   </style>
+  <style id="live-full-width">
+    /* Scoreboard stretches edge to edge. The wings sit behind the board and reach both screen edges;
+       the team panels, scores and everything inside keep their original centred position. */
+    html, body.live-overlay { overflow-x: hidden !important; }   /* the wings never create a horizontal scrollbar */
+    :root { --board-gap: 0px; }              /* gap between the bottom of the screen and the board — raise it (e.g. 24px) if you want it to float */
+    body.live-overlay .scoreboard {
+      bottom: var(--board-gap) !important;
+      background: linear-gradient(180deg, #14141b, #07070a) !important;      /* fully solid so it matches the wings */
+      backdrop-filter: none !important;
+      border-left: 0 !important; border-right: 0 !important;
+      border-bottom: 0 !important;
+    }
+    .board-wings {
+      position: absolute; z-index: -1; top: 0; bottom: 0;
+      left: calc(50% - 50vw); right: calc(50% - 50vw);
+      background: linear-gradient(180deg, #14141b, #07070a);
+      border-top: 1px solid #2b2b35;
+      box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+      pointer-events: none;
+    }
+    body.live-overlay .scoreboard::before { left: calc(50% - 50vw) !important; right: calc(50% - 50vw) !important; }   /* light sheen runs the full width */
+  </style>
 </head>
 <body class="live-overlay">
   <main class="live-shell" aria-label="The Entity Championship live overlay">
@@ -335,6 +357,7 @@
     </header>
 
     <section class="scoreboard" id="scoreboard" aria-live="polite">
+      <div class="board-wings" aria-hidden="true"></div>
       <div class="score-meta">
         <span id="round-label">AWAITING MATCH</span>
         <span class="meta-divider">◆</span>
