@@ -288,7 +288,7 @@
     /* ===== Win card ===== */
     .win-card{animation:lp-win-card .9s cubic-bezier(.2,1.2,.3,1) both;box-shadow:0 0 70px rgba(225,29,46,.35)}
     .win-name{text-shadow:0 0 40px rgba(255,255,255,.3)}
-    .win-celebration::before{content:"";position:absolute;left:50%;top:50%;width:30vmin;height:30vmin;margin:-15vmin 0 0 -15vmin;border-radius:50%;border:3px solid var(--gold);animation:lp-shock 1.4s ease-out both}
+    .win-celebration::before{content:"absolute;left:50%;top:50%;width:30vmin;height:30vmin;margin:-15vmin 0 0 -15vmin;border-radius:50%;border:3px solid var(--gold);animation:lp-shock 1.4s ease-out both}
     @keyframes lp-win-card{from{opacity:0;scale:.7;filter:blur(8px)}to{opacity:1;scale:1;filter:blur(0)}}
     @keyframes lp-shock{from{scale:.2;opacity:.9}to{scale:4.5;opacity:0}}
 
@@ -324,11 +324,13 @@
       body.live-overlay .live-team.a.has-logo .score{left:0}body.live-overlay .live-team.b.has-logo .score{right:0}}
     @media (prefers-reduced-motion:reduce){.team-logo.logo-in{animation:none!important}}
   </style>
+
   <style id="live-full-width">
     /* Scoreboard stretches edge to edge. The wings sit behind the board and reach both screen edges;
        the team panels, scores and everything inside keep their original centred position. */
     html, body.live-overlay { overflow-x: hidden !important; }   /* the wings never create a horizontal scrollbar */
     :root { --board-gap: 0px; }              /* gap between the bottom of the screen and the board — raise it (e.g. 24px) if you want it to float */
+    
     body.live-overlay .scoreboard {
       bottom: var(--board-gap) !important;
       background: linear-gradient(180deg, #14141b, #07070a) !important;      /* fully solid so it matches the wings */
@@ -336,6 +338,7 @@
       border-left: 0 !important; border-right: 0 !important;
       border-bottom: 0 !important;
     }
+    
     .board-wings {
       position: absolute; z-index: -1; top: 0; bottom: 0;
       left: calc(50% - 50vw); right: calc(50% - 50vw);
@@ -344,6 +347,24 @@
       box-shadow: 0 -18px 50px rgba(0,0,0,.5);
       pointer-events: none;
     }
+
+    /* Option 3: Hazard / Caution Striping */
+    .board-wings::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.02),
+        rgba(255, 255, 255, 0.02) 15px,
+        transparent 15px,
+        transparent 30px
+      );
+      /* Fades out the stripes in the middle behind the actual scoreboard */
+      mask-image: linear-gradient(90deg, black 0%, transparent 18%, transparent 82%, black 100%);
+      -webkit-mask-image: linear-gradient(90deg, black 0%, transparent 18%, transparent 82%, black 100%);
+    }
+
     body.live-overlay .scoreboard::before { left: calc(50% - 50vw) !important; right: calc(50% - 50vw) !important; }   /* light sheen runs the full width */
   </style>
 </head>
@@ -526,7 +547,7 @@
       let swapTimer;
       window.sideSwapStinger = (roleA, roleB) => {
         const el = $('side-swap'); if (!el) return;
-        $('ss-a-name').textContent = $('team-a-name').textContent; $('ss-b-name').textContent = $('team-b-name').textContent;
+        $('ss-a-name').textContent =$('team-a-name').textContent; $('ss-b-name').textContent =$('team-b-name').textContent;
         for (const [k, r] of [['a', roleA], ['b', roleB]]) { const s = $('ss-' + k + '-role'); s.textContent = '→ ' + r; s.dataset.role = r.toLowerCase(); }
         el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
         clearTimeout(swapTimer); swapTimer = setTimeout(() => el.classList.remove('on'), 2950);
@@ -543,7 +564,7 @@
       const num = (t) => parseInt(String(t).replace(/[^\d-]/g, ''), 10);
       const lead = () => {
         const a = num($('team-a-score').textContent), b = num($('team-b-score').textContent);
-        $('team-a-panel').classList.toggle('leading', a > b); $('team-b-panel').classList.toggle('leading', b > a);
+        $('team-a-panel').classList.toggle('leading', a > b);$('team-b-panel').classList.toggle('leading', b > a);
       };
       const watch = (id, cls, onChange) => {
         const el = $(id); if (!el) return; let last = el.textContent;
@@ -623,7 +644,7 @@
       }
 
       for (const k of ['a', 'b']) {
-        const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap = $('team-' + k + '-logo');
+        const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap =$('team-' + k + '-logo');
         watchText('team-' + k + '-name', (team) => {
           if (team) panel.style.setProperty('--acc-rgb', team.acc); else panel.style.removeProperty('--acc-rgb');
           setImg(img, team, (ok) => {
@@ -633,7 +654,7 @@
         });
       }
       watchText('toss-winner-name', (team) => setImg($('toss-img'), team));
-      watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok) $('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
+      watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok)$('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
 
 
       if (new URLSearchParams(location.search).get('logos') === 'debug') {
