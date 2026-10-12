@@ -774,6 +774,160 @@
       body.live-overlay .scoreboard::before { animation: none !important; }
     }
   </style>
+
+  <style id="entity-hybrid-polish">
+    /* Hybrid broadcast pass: cinematic Entity atmosphere + readable esports HUD. */
+    :root {
+      --entity-red: 225,29,46;
+      --entity-cyan: 112,232,244;
+      --entity-metal: 190,192,210;
+    }
+
+    /* Give the wings a deeper metallic base and a low-contrast horror haze.
+       The base remains opaque so the game HUD cannot show through the covered area. */
+    body.live-overlay .board-wings {
+      background:
+        radial-gradient(ellipse at 2% 110%, rgba(225,29,46,.28), transparent 42%),
+        radial-gradient(ellipse at 98% 110%, rgba(112,232,244,.23), transparent 42%),
+        radial-gradient(ellipse at 50% 130%, rgba(80,70,92,.20), transparent 58%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 14px),
+        linear-gradient(180deg, #17171f 0%, #0a0a10 60%, #050507 100%) !important;
+      border-top: 1px solid rgba(210,210,225,.28);
+      box-shadow: 0 -20px 55px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.05);
+    }
+
+    /* Fine metallic rails and angled corner accents. */
+    body.live-overlay .board-wings::before,
+    body.live-overlay .board-wings::after {
+      width: min(38vw, 620px);
+      opacity: .9;
+      filter: drop-shadow(0 0 7px rgba(0,0,0,.4));
+    }
+    body.live-overlay .board-wings::before {
+      background:
+        linear-gradient(90deg, rgba(225,29,46,.22), transparent 76%),
+        linear-gradient(135deg, transparent 0 14%, rgba(255,70,85,.48) 14.2% 14.5%, transparent 14.7% 31%, rgba(255,70,85,.18) 31.2% 31.45%, transparent 31.7%),
+        repeating-linear-gradient(0deg, transparent 0 24px, rgba(225,29,46,.09) 25px 26px, transparent 27px 42px);
+      border-right: 1px solid rgba(225,29,46,.46);
+    }
+    body.live-overlay .board-wings::after {
+      background:
+        linear-gradient(270deg, rgba(112,232,244,.19), transparent 76%),
+        linear-gradient(225deg, transparent 0 14%, rgba(112,232,244,.42) 14.2% 14.5%, transparent 14.7% 31%, rgba(112,232,244,.17) 31.2% 31.45%, transparent 31.7%),
+        repeating-linear-gradient(0deg, transparent 0 24px, rgba(112,232,244,.075) 25px 26px, transparent 27px 42px);
+      border-left: 1px solid rgba(112,232,244,.42);
+    }
+
+    /* Tight, legible match metadata. */
+    body.live-overlay .score-meta {
+      min-height: 28px;
+      letter-spacing: .17em;
+      color: #c3c2cf;
+      text-shadow: 0 1px 8px rgba(0,0,0,.9);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    body.live-overlay .score-meta .meta-divider { color: #777887; }
+
+    /* Make team panels feel inset into the metal frame, without increasing their height. */
+    body.live-overlay .live-team {
+      overflow: hidden;
+      background-image:
+        repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 1px, transparent 1px 12px),
+        linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.72));
+    }
+    body.live-overlay .live-team[data-role="killer"] {
+      background-color: rgba(37,10,17,.94);
+      box-shadow: inset 0 3px 0 rgba(255,70,85,.9), inset 0 -3px 0 rgba(var(--acc-rgb,225,29,46),.8);
+    }
+    body.live-overlay .live-team[data-role="survivor"] {
+      background-color: rgba(8,26,31,.95);
+      box-shadow: inset 0 3px 0 rgba(112,232,244,.9), inset 0 -3px 0 rgba(var(--acc-rgb,112,232,244),.8);
+    }
+    body.live-overlay .live-team .team-name {
+      font-size: clamp(1.45rem, 2.9vw, 3.15rem);
+      letter-spacing: .045em;
+      line-height: .98;
+      text-shadow: 0 2px 14px rgba(0,0,0,.85);
+    }
+    body.live-overlay .live-team .team-status {
+      color: #a6a5b2;
+      letter-spacing: .13em;
+    }
+    body.live-overlay .live-team .score {
+      font-size: clamp(2.7rem, 6vh, 4.6rem);
+      text-shadow: 0 0 20px rgba(255,255,255,.08);
+    }
+    body.live-overlay .team-role {
+      backdrop-filter: blur(3px);
+      background: rgba(4,4,7,.78);
+      box-shadow: 0 0 18px rgba(0,0,0,.25);
+    }
+
+    /* VS becomes a small energy core rather than a flat label. */
+    body.live-overlay .versus {
+      position: relative;
+      isolation: isolate;
+      background: linear-gradient(180deg, rgba(17,17,24,.98), rgba(5,5,8,.98));
+      border-left: 1px solid rgba(255,255,255,.08);
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+    body.live-overlay .versus::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      width: 90%;
+      aspect-ratio: 1;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-58%);
+      background: radial-gradient(circle, rgba(225,29,46,.22), rgba(112,232,244,.06) 42%, transparent 72%);
+      pointer-events: none;
+    }
+    body.live-overlay .versus .vs {
+      color: #d2d0da;
+      text-shadow: 0 0 12px rgba(225,29,46,.55), 0 0 24px rgba(112,232,244,.12);
+    }
+
+    /* Score extras remain compact and easy to scan. */
+    body.live-overlay .score-extras {
+      border-top: 1px solid rgba(255,255,255,.08);
+      background: linear-gradient(90deg, rgba(225,29,46,.07), rgba(0,0,0,.2) 48%, rgba(112,232,244,.07));
+      color: #b8b7c4;
+      letter-spacing: .06em;
+    }
+    body.live-overlay .score-extras b { color: #f1f0f5; }
+
+    /* Existing score, role-swap, and victory effects get a restrained event-only boost. */
+    body.live-overlay .live-team.scored::after {
+      background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.16), rgba(95,224,160,.25) 25%, transparent 72%);
+    }
+    body.live-overlay .live-team.swapping::after {
+      background: linear-gradient(100deg, transparent 20%, rgba(var(--c),.58) 50%, transparent 80%);
+    }
+    body.live-overlay .win-celebration {
+      background: radial-gradient(ellipse at center, rgba(225,29,46,.34), rgba(4,4,8,.91));
+      backdrop-filter: blur(5px);
+    }
+    body.live-overlay .win-card {
+      border-color: rgba(255,70,85,.8);
+      background: linear-gradient(145deg, rgba(25,13,19,.98), rgba(5,5,8,.98));
+      box-shadow: 0 0 60px rgba(225,29,46,.25), inset 0 0 24px rgba(255,255,255,.025);
+    }
+
+    @media (max-width: 850px) {
+      body.live-overlay .live-team .team-name { font-size: clamp(1.1rem, 3.5vw, 2rem); }
+      body.live-overlay .score-meta { letter-spacing: .08em; }
+      body.live-overlay .board-wings::before,
+      body.live-overlay .board-wings::after { width: 34vw; }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .live-team .team-name { font-size: clamp(.95rem, 4.1vw, 1.45rem); }
+      body.live-overlay .score-extras { font-size: .55rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.live-overlay .scoreboard::before { animation: none !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
