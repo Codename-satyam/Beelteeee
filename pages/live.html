@@ -1,674 +1,1346 @@
 <!doctype html>
+
 <html lang="en" class="overlay-mode">
+
 <head>
+
   <meta charset="utf-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <meta name="theme-color" content="transparent">
+
   <title>Live Overlay — The Entity Championship</title>
+
   <link rel="stylesheet" href="../shared/shared.css">
+
   <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script defer src="../shared/shared.js"></script>
+
   <script defer src="../shared/scoring-engine.js"></script>
+
   <script defer src="../shared/live-page.js"></script>
+
   <style>
+
     /* Live overlay-only adjustments. Keep shared project files untouched. */
+
     html.overlay-mode, html.overlay-mode body, body.live-overlay {
+
       background: transparent !important;
+
       background-color: transparent !important;
+
     }
+
     body.live-overlay .live-shell {
+
       width: min(1260px, calc(100% - 80px));
+
       grid-template-rows: auto minmax(0, 1fr);
+
       gap: clamp(8px, 1.4vh, 16px);
+
       padding: clamp(14px, 2.5vh, 26px) 0;
+
     }
+
     body.live-overlay .scoreboard {
+
       align-self: center;
+
       justify-self: center;
+
       width: 100%;
+
     }
+
     body.live-overlay .teams-score {
+
       align-items: stretch;
+
     }
+
     body.live-overlay .live-team {
+
       position: relative;
+
       display: flex;
+
       flex-direction: column;
+
       align-items: center;
+
       justify-content: flex-start;
+
       /* Use a definite panel height so the score can anchor to its bottom. */
+
       height: clamp(220px, 25vh, 270px);
+
       min-height: 0;
+
       padding: clamp(16px, 2.2vh, 24px) clamp(12px, 1.8vw, 24px) 86px;
+
       transition: background .42s ease, filter .42s ease;
+
     }
+
     body.live-overlay .live-team[data-role="killer"] {
+
       background: linear-gradient(180deg, rgba(225,29,46,.075), transparent 74%);
+
     }
+
     body.live-overlay .live-team[data-role="survivor"] {
+
       background: linear-gradient(180deg, rgba(112,232,244,.07), transparent 74%);
+
     }
+
     body.live-overlay .live-team .team-name {
+
       margin: clamp(7px, 1.1vh, 12px) 0 8px;
+
       font-size: clamp(1.4rem, 3vw, 3.35rem);
+
     }
+
     .team-role {
+
       align-self: center;
+
       display: inline-flex;
+
       align-items: center;
+
       justify-content: center;
+
       min-height: 22px;
+
       margin: 2px 0 7px;
+
       padding: 4px 9px;
+
       border: 1px solid rgba(255,255,255,.17);
+
       background: rgba(0,0,0,.32);
+
       color: #d1d1d9;
+
       font: 800 clamp(.48rem, .58vw, .62rem)/1 var(--mono);
+
       letter-spacing: .13em;
+
       white-space: nowrap;
+
       transform-style: preserve-3d;
+
       backface-visibility: hidden;
+
     }
+
     .team-role[data-role="killer"] {
+
       border-color: rgba(255,100,117,.58);
+
       color: #ff7581;
+
       box-shadow: 0 0 15px rgba(255,70,85,.08);
+
     }
+
     .team-role[data-role="survivor"] {
+
       border-color: rgba(112,232,244,.52);
+
       color: #70e8f4;
+
       box-shadow: 0 0 15px rgba(112,232,244,.08);
+
     }
+
     .team-role.role-flip { animation: role-swap-in .62s cubic-bezier(.2,.85,.25,1) both; }
+
     .live-team.role-changing { animation: role-panel-pulse .62s ease both; }
+
     @keyframes role-swap-in {
+
       0% { opacity: .15; transform: perspective(500px) rotateX(-88deg) translateY(7px) scale(.9); filter: blur(4px); }
+
       58% { opacity: 1; transform: perspective(500px) rotateX(12deg) translateY(-2px) scale(1.05); filter: blur(0); }
+
       100% { opacity: 1; transform: perspective(500px) rotateX(0) translateY(0) scale(1); }
+
     }
+
     @keyframes role-panel-pulse {
+
       0% { filter: brightness(.8); }
+
       45% { filter: brightness(1.3); }
+
       100% { filter: brightness(1); }
+
     }
+
     /* Put the score value at the foot of each team panel. */
+
     body.live-overlay .live-team .team-status {
+
       margin-top: 0;
+
       font-size: clamp(.44rem, .54vw, .56rem);
+
     }
+
     body.live-overlay .live-team .score {
+
       /* Absolute anchoring prevents flex/grid content from pulling it back to center. */
+
       position: absolute;
+
       left: 0;
+
       right: 0;
+
       bottom: clamp(13px, 1.8vh, 20px);
+
       margin: 0 !important;
+
       padding: 0 !important;
+
       text-align: center;
+
       font-size: clamp(3rem, 7vh, 5.5rem);
+
       line-height: .82;
+
     }
+
     /* This compact overlay intentionally removes the large points-schema strip. */
+
     .points-schema { display: none !important; }
+
     .score-popups, .point-popups { z-index: 30; }
+
     @media (max-width: 850px) {
+
       body.live-overlay .live-shell { width: calc(100% - 28px); padding: 12px 0; gap: 8px; }
+
       body.live-overlay .live-team { height: 220px; min-height: 0; padding: 16px 8px 76px; }
+
       body.live-overlay .live-team .score { font-size: clamp(2.7rem, 8vh, 4.4rem); }
+
       body.live-overlay .toss-banner-advantage { display: none; }
+
     }
+
     @media (max-width: 520px) {
+
       body.live-overlay .live-shell { width: calc(100% - 14px); }
+
       body.live-overlay .live-team { height: 190px; min-height: 0; padding: 13px 4px 68px; }
+
       body.live-overlay .live-team .score { font-size: clamp(2.3rem, 10vw, 3.5rem); }
+
       .team-role { font-size: .42rem; letter-spacing: .06em; padding: 4px 5px; }
+
     }
+
     @media (prefers-reduced-motion: reduce) {
+
       .team-role.role-flip, .live-team.role-changing { animation: none !important; }
+
     }
+
   </style>
+
+
 
   <style id="bottom-docked-overlay-fix">
+
     /* Keep the toss banner compact at the top while docking the ENTIRE scoreboard panel at the bottom. */
+
     html.overlay-mode,
+
     html.overlay-mode body,
+
     body.live-overlay {
+
       width: 100%;
+
       height: 100%;
+
       min-height: 100%;
+
       overflow: hidden !important;
+
     }
+
+
 
     body.live-overlay .live-shell {
+
       position: fixed !important;
+
       inset: 0 !important;
+
       width: min(1440px, calc(100% - 68px)) !important;
+
       height: 100vh !important;
+
       height: 100dvh !important;
+
       min-height: 0 !important;
+
       margin: 0 auto !important;
+
       padding: 0 !important;
+
       display: block !important;
+
       isolation: isolate;
+
       overflow: visible;
+
     }
+
+
 
     body.live-overlay .toss-banner {
+
       position: absolute !important;
+
       top: clamp(14px, 2.6vh, 30px) !important;
+
       left: 50% !important;
+
       right: auto !important;
+
       bottom: auto !important;
+
       transform: translateX(-50%);
+
       z-index: 10;
+
       max-width: min(92%, 680px);
+
       margin: 0;
+
     }
+
+
 
     body.live-overlay .scoreboard {
+
       position: absolute !important;
+
       top: auto !important;
+
       left: 0 !important;
+
       right: 0 !important;
+
       bottom: clamp(18px, 3.5vh, 38px) !important;
+
       width: 100% !important;
+
       margin: 0 !important;
+
       transform: none !important;
+
       z-index: 5;
+
     }
+
+
 
     /* Point-award popups stay aligned to the vertical center of the full panel. */
+
     body.live-overlay .point-popups {
+
       top: 50%;
+
       bottom: auto;
+
       z-index: 20;
+
     }
+
+
 
     @media (max-width: 850px) {
+
       body.live-overlay .live-shell {
+
         width: calc(100% - 24px) !important;
+
       }
+
       body.live-overlay .toss-banner {
+
         max-width: 98%;
+
       }
+
     }
 
+
+
     @media (max-width: 520px) {
+
       body.live-overlay .live-shell {
+
         width: calc(100% - 14px) !important;
+
       }
+
       body.live-overlay .scoreboard {
+
         bottom: 12px !important;
+
       }
+
       body.live-overlay .toss-banner {
+
         top: 10px !important;
+
       }
+
     }
+
   </style>
+
+
+
 
 
   <style id="live-missing-styles">
+
     /* Styles for elements live.html uses that shared.css does not define. */
+
     .toss-banner{display:flex;align-items:center;gap:10px;padding:8px 18px;border:1px solid rgba(244,201,93,.5);background:rgba(8,8,11,.86);color:#fff;font:700 .62rem var(--mono);letter-spacing:.12em;white-space:nowrap}
+
     .toss-banner strong{font:900 1.15rem var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+
     .toss-banner-mark{color:var(--red2)}.toss-banner-label{color:#aaaab8}.toss-banner-advantage{color:#d6d6de}
+
     body.live-overlay .scoreboard{background:rgba(8,8,11,.9);border:1px solid #303039;backdrop-filter:blur(4px)}
+
     .point-popups{position:absolute;top:50%;width:34%;height:0;display:flex;flex-direction:column;align-items:center;pointer-events:none}
+
     .point-popups-a{left:0}.point-popups-b{right:0}
+
     .point-popup{position:absolute;font:900 clamp(2.4rem,6vh,4.6rem)/1 var(--display);color:var(--green);text-shadow:0 0 22px rgba(95,224,160,.6);animation:point-pop 2.4s ease-out forwards}
+
     @keyframes point-pop{0%{opacity:0;transform:translateY(24px) scale(.6)}15%{opacity:1;transform:translateY(0) scale(1.15)}70%{opacity:1}100%{opacity:0;transform:translateY(-80px) scale(1)}}
+
     .win-celebration{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(225,29,46,.28),rgba(0,0,0,.78));animation:win-in .5s ease both}
+
     .win-celebration[hidden]{display:none}
+
     @keyframes win-in{from{opacity:0}to{opacity:1}}
+
     .win-card{text-align:center;padding:34px 70px;border:1px solid var(--red);background:rgba(8,8,11,.92)}
+
     .win-kicker{font:700 .6rem var(--mono);letter-spacing:.2em;color:var(--red2)}
+
     .win-title{margin-top:12px;font:900 clamp(1.4rem,3vw,2.4rem) var(--display);letter-spacing:.2em;color:#c6c6d0}
+
     .win-name{margin:8px 0;font:900 clamp(2.6rem,8vw,6.5rem)/.9 var(--display);text-transform:uppercase;color:#fff;overflow-wrap:anywhere}
+
     .win-subtitle{font:700 .66rem var(--mono);letter-spacing:.2em;color:var(--gold)}
+
     .win-particles i{position:absolute;top:-10px;width:6px;height:14px;background:var(--gold);opacity:.9;animation:win-fall linear infinite}
+
     .win-particles i:nth-child(3n){background:var(--red2)}.win-particles i:nth-child(3n+1){background:#fff}
+
     @keyframes win-fall{to{transform:translateY(110vh) rotate(540deg)}}
+
   </style>
+
   <style id="live-polish">
+
     /* ===== Shorter bottom panel ===== */
+
     body.live-overlay .live-team{--c:120,120,132;height:clamp(160px,18.5vh,200px);padding:clamp(10px,1.5vh,16px) clamp(12px,1.8vw,24px) 60px;
+
       box-shadow:inset 0 3px 0 rgba(var(--c),.85);transition:box-shadow .5s ease,background .42s ease,filter .42s ease}
+
     body.live-overlay .live-team[data-role="killer"]{--c:255,70,85}
+
     body.live-overlay .live-team[data-role="survivor"]{--c:112,232,244}
+
     body.live-overlay .live-team .team-name{font-size:clamp(1.3rem,2.7vw,3rem);margin:clamp(4px,.7vh,8px) 0 5px}
+
     body.live-overlay .live-team .score{font-size:clamp(2.4rem,5.4vh,4.2rem);bottom:clamp(8px,1.3vh,14px);font-variant-numeric:tabular-nums}
+
     @media (max-width:850px){body.live-overlay .live-team{height:156px;padding-bottom:54px}}
+
     @media (max-width:520px){body.live-overlay .live-team{height:136px;padding-bottom:48px}}
 
+
+
     /* ===== Look ===== */
+
     body.live-overlay .scoreboard{background:linear-gradient(180deg,rgba(18,18,25,.94),rgba(6,6,9,.95));border-color:#2b2b35;
+
       box-shadow:0 22px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);animation:lp-board-in .9s cubic-bezier(.2,.85,.25,1) both}
+
     body.live-overlay .scoreboard::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;z-index:3;pointer-events:none;
+
       background:linear-gradient(90deg,transparent,#e11d2e 18%,#fff 50%,#e11d2e 82%,transparent);background-size:220% 100%;animation:lp-sheen 6s linear infinite}
+
     body.live-overlay .toss-banner{animation:lp-banner-in .8s .35s cubic-bezier(.2,.85,.25,1) both}
+
     body.live-overlay .versus .vs{text-shadow:0 0 20px rgba(255,70,85,.65);animation:lp-vs 3.2s ease-in-out infinite}
+
     body.live-overlay .live-team .score{transition:text-shadow .5s ease}
+
     body.live-overlay .live-team.leading[data-role="killer"] .score{text-shadow:0 0 28px rgba(255,70,85,.65)}
+
     body.live-overlay .live-team.leading[data-role="survivor"] .score{text-shadow:0 0 28px rgba(112,232,244,.6)}
+
     @keyframes lp-board-in{from{opacity:0;translate:0 46px}to{opacity:1;translate:0 0}}
+
     @keyframes lp-banner-in{from{opacity:0;translate:0 -30px}to{opacity:1;translate:0 0}}
+
     @keyframes lp-sheen{from{background-position:220% 0}to{background-position:-220% 0}}
+
     @keyframes lp-vs{50%{text-shadow:0 0 34px rgba(255,70,85,.95)}}
 
+
+
     /* ===== Live-data animations (triggered by JS when text changes) ===== */
+
     .lp-tick{animation:lp-tick .55s cubic-bezier(.2,1.3,.4,1)}
+
     .lp-bump{animation:lp-bump .75s cubic-bezier(.2,1.4,.4,1)}
+
     @keyframes lp-tick{0%{opacity:.15;scale:.84;filter:blur(3px)}60%{scale:1.07;filter:blur(0)}100%{opacity:1;scale:1}}
+
     @keyframes lp-bump{0%{scale:1}30%{scale:1.3;color:#5fe0a0;text-shadow:0 0 34px rgba(95,224,160,.85)}100%{scale:1}}
+
     body.live-overlay .live-team::after{content:"";position:absolute;inset:0;opacity:0;pointer-events:none;z-index:2}
+
     body.live-overlay .live-team.scored::after{background:radial-gradient(ellipse at 50% 100%,rgba(95,224,160,.4),transparent 70%);animation:lp-flash .9s ease-out}
+
     body.live-overlay .live-team.swapping::after{background:linear-gradient(100deg,transparent 30%,rgba(var(--c),.5) 50%,transparent 70%);animation:lp-sweep 1.1s .25s ease-in-out}
+
     @keyframes lp-flash{0%{opacity:1}100%{opacity:0}}
+
     @keyframes lp-sweep{0%{opacity:1;transform:translateX(-100%)}99%{opacity:1}100%{opacity:0;transform:translateX(100%)}}
 
+
+
     /* ===== Side-swap stinger (plays when Killer / Survivor roles change) ===== */
+
     .side-swap{position:absolute;inset:0;z-index:12;display:none;grid-template-columns:1fr auto 1fr;align-items:center;gap:2vw;padding:0 3vw;
+
       background:linear-gradient(90deg,rgba(6,6,9,.97),rgba(16,16,22,.98) 50%,rgba(6,6,9,.97));border-top:2px solid var(--gold);pointer-events:none}
+
     .side-swap.on{display:grid;animation:lp-ss-life 2.9s ease both}
+
     .ss-lane{display:flex;flex-direction:column;gap:6px;min-width:0}
+
     .ss-lane b{font:900 clamp(1.1rem,2.4vw,2.4rem)/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
     .ss-lane span{font:800 clamp(.6rem,.9vw,.9rem) var(--mono);letter-spacing:.2em}
+
     .ss-lane span[data-role="killer"]{color:#ff7581}.ss-lane span[data-role="survivor"]{color:#70e8f4}
+
     .ss-a{align-items:flex-start;animation:lp-ss-a .7s .2s cubic-bezier(.2,.9,.2,1) both}
+
     .ss-b{align-items:flex-end;text-align:right;animation:lp-ss-b .7s .2s cubic-bezier(.2,.9,.2,1) both}
+
     .ss-mid{display:flex;flex-direction:column;align-items:center;gap:4px}
+
     .ss-mid i{font:900 clamp(1.8rem,4vw,3.4rem)/1 var(--display);font-style:normal;color:var(--gold);animation:lp-ss-spin 1.1s .1s cubic-bezier(.3,1.3,.4,1) both}
+
     .ss-mid em{font:800 clamp(.6rem,.95vw,.95rem) var(--mono);font-style:normal;letter-spacing:.34em;color:#d6d6de;animation:lp-ss-track 1.4s .1s ease-out both}
+
     @keyframes lp-ss-life{0%{clip-path:inset(0 50% 0 50%)}14%,86%{clip-path:inset(0)}100%{clip-path:inset(0 50% 0 50%)}}
+
     @keyframes lp-ss-a{from{opacity:0;translate:-60px 0}to{opacity:1;translate:0 0}}
+
     @keyframes lp-ss-b{from{opacity:0;translate:60px 0}to{opacity:1;translate:0 0}}
+
     @keyframes lp-ss-spin{from{rotate:-180deg;scale:.4;opacity:0}to{rotate:0deg;scale:1;opacity:1}}
+
     @keyframes lp-ss-track{from{letter-spacing:.8em;opacity:0}to{letter-spacing:.34em;opacity:1}}
 
+
+
     /* ===== Win card ===== */
+
     .win-card{animation:lp-win-card .9s cubic-bezier(.2,1.2,.3,1) both;box-shadow:0 0 70px rgba(225,29,46,.35)}
+
     .win-name{text-shadow:0 0 40px rgba(255,255,255,.3)}
-    .win-celebration::before{content:"absolute;left:50%;top:50%;width:30vmin;height:30vmin;margin:-15vmin 0 0 -15vmin;border-radius:50%;border:3px solid var(--gold);animation:lp-shock 1.4s ease-out both}
+
+    .win-celebration::before{content:"";position:absolute;left:50%;top:50%;width:30vmin;height:30vmin;margin:-15vmin 0 0 -15vmin;border-radius:50%;border:3px solid var(--gold);animation:lp-shock 1.4s ease-out both}
+
     @keyframes lp-win-card{from{opacity:0;scale:.7;filter:blur(8px)}to{opacity:1;scale:1;filter:blur(0)}}
+
     @keyframes lp-shock{from{scale:.2;opacity:.9}to{scale:4.5;opacity:0}}
 
+
+
     @media (prefers-reduced-motion:reduce){.lp-tick,.lp-bump,.side-swap.on,.win-card,.win-celebration::before,body.live-overlay .scoreboard,body.live-overlay .toss-banner,body.live-overlay .scoreboard::before,body.live-overlay .versus .vs,.ss-a,.ss-b,.ss-mid i,.ss-mid em,.live-team.scored::after,.live-team.swapping::after{animation:none!important}}
+
   </style>
+
   <style id="live-logos">
+
     /* ===== Team logos (outer edge of each panel) ===== */
+
     :root{--logo:clamp(104px,9.5vw,150px);--logo-pad:calc(var(--logo) + clamp(16px,2.2vw,32px))}
+
     body.live-overlay .live-team .team-logo{position:absolute;top:calc(50% - 8px);translate:0 -50%;width:var(--logo);height:var(--logo);z-index:3;pointer-events:none;display:none}
+
     body.live-overlay .live-team.a .team-logo{left:clamp(8px,1.4vw,22px)}
+
     body.live-overlay .live-team.b .team-logo{right:clamp(8px,1.4vw,22px)}
+
     body.live-overlay .live-team.has-logo .team-logo{display:block}
+
     .team-logo::before{content:"";position:absolute;inset:-8%;z-index:-1;background:radial-gradient(circle,rgba(var(--acc-rgb,120,120,132),.3),transparent 66%)}
+
     .team-logo img{width:100%;height:100%;object-fit:contain;scale:1.18;filter:drop-shadow(0 8px 18px rgba(var(--acc-rgb,0,0,0),.4))}
+
     /* text block + score shift away from the logo so nothing overlaps */
+
     body.live-overlay .live-team.a.has-logo{padding-left:var(--logo-pad)}
+
     body.live-overlay .live-team.b.has-logo{padding-right:var(--logo-pad)}
+
     body.live-overlay .live-team.a.has-logo .score{left:var(--logo-pad)}
+
     body.live-overlay .live-team.b.has-logo .score{right:var(--logo-pad)}
+
     body.live-overlay .live-team.has-logo{box-shadow:inset 0 3px 0 rgba(var(--c),.85),inset 0 -3px 0 rgba(var(--acc-rgb),.9)}  /* top = role colour, bottom = team colour */
+
     body.live-overlay .live-team.has-logo .team-name{text-shadow:0 0 26px rgba(var(--acc-rgb),.4)}
+
     .team-logo.logo-in{animation:lp-logo-in .8s cubic-bezier(.2,1.1,.3,1) both}
+
     @keyframes lp-logo-in{from{opacity:0;scale:.55;rotate:-10deg}to{opacity:1;scale:1;rotate:0deg}}
 
+
+
     /* ===== Logos in the toss banner, side-swap stinger and win card ===== */
+
     .mini-logo{width:30px;height:30px;object-fit:contain;scale:1.25}
+
     .ss-logo{width:clamp(54px,7vw,92px);height:clamp(54px,7vw,92px);object-fit:contain;scale:1.15;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))}
+
     .win-logo{display:block;width:clamp(90px,16vh,150px);height:clamp(90px,16vh,150px);object-fit:contain;margin:0 auto 4px;scale:1.15;filter:drop-shadow(0 0 26px rgba(var(--acc-rgb,255,70,85),.55))}
+
     .mini-logo[hidden],.ss-logo[hidden],.win-logo[hidden]{display:none}
 
+
+
     @media (max-width:850px){body.live-overlay .live-team .team-logo{display:none !important}
+
       body.live-overlay .live-team.a.has-logo{padding-left:8px}body.live-overlay .live-team.b.has-logo{padding-right:8px}
+
       body.live-overlay .live-team.a.has-logo .score{left:0}body.live-overlay .live-team.b.has-logo .score{right:0}}
+
     @media (prefers-reduced-motion:reduce){.team-logo.logo-in{animation:none!important}}
+
   </style>
 
   <style id="live-full-width">
+
     /* Scoreboard stretches edge to edge. The wings sit behind the board and reach both screen edges;
+
        the team panels, scores and everything inside keep their original centred position. */
+
     html, body.live-overlay { overflow-x: hidden !important; }   /* the wings never create a horizontal scrollbar */
+
     :root { --board-gap: 0px; }              /* gap between the bottom of the screen and the board — raise it (e.g. 24px) if you want it to float */
-    
+
     body.live-overlay .scoreboard {
+
       bottom: var(--board-gap) !important;
+
       background: linear-gradient(180deg, #14141b, #07070a) !important;      /* fully solid so it matches the wings */
+
       backdrop-filter: none !important;
+
       border-left: 0 !important; border-right: 0 !important;
+
       border-bottom: 0 !important;
-    }
-    
-    .board-wings {
-      position: absolute; z-index: -1; top: 0; bottom: 0;
-      left: calc(50% - 50vw); right: calc(50% - 50vw);
-      background: linear-gradient(180deg, #14141b, #07070a);
-      border-top: 1px solid #2b2b35;
-      box-shadow: 0 -18px 50px rgba(0,0,0,.5);
-      pointer-events: none;
+
     }
 
-    /* Option 3: Hazard / Caution Striping */
-    .board-wings::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        -45deg,
-        rgba(255, 255, 255, 0.02),
-        rgba(255, 255, 255, 0.02) 15px,
-        transparent 15px,
-        transparent 30px
-      );
-      /* Fades out the stripes in the middle behind the actual scoreboard */
-      mask-image: linear-gradient(90deg, black 0%, transparent 18%, transparent 82%, black 100%);
-      -webkit-mask-image: linear-gradient(90deg, black 0%, transparent 18%, transparent 82%, black 100%);
+    .board-wings {
+
+      position: absolute; z-index: -1; top: 0; bottom: 0;
+
+      left: calc(50% - 50vw); right: calc(50% - 50vw);
+
+      background: linear-gradient(180deg, #14141b, #07070a);
+
+      border-top: 1px solid #2b2b35;
+
+      box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+
+      pointer-events: none;
+
     }
 
     body.live-overlay .scoreboard::before { left: calc(50% - 50vw) !important; right: calc(50% - 50vw) !important; }   /* light sheen runs the full width */
+
+  </style>
+
+
+  <style id="entity-fog-privacy-wings">
+    /* Entity fog wings: opaque coverage for the lower left/right game HUD areas. */
+    .board-wings {
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 8% 78%, rgba(117, 12, 28, .42), transparent 38%),
+        radial-gradient(ellipse at 92% 78%, rgba(13, 105, 119, .28), transparent 38%),
+        linear-gradient(180deg, #111117 0%, #08080c 58%, #050507 100%) !important;
+      border-top: 1px solid rgba(255,255,255,.10);
+    }
+    .board-wings::before, .board-wings::after {
+      content: "";
+      position: absolute;
+      inset: -35% -12%;
+      pointer-events: none;
+      background: repeating-radial-gradient(ellipse at 18% 70%,
+        transparent 0 22px, rgba(175, 175, 195, .035) 34px, transparent 57px);
+      filter: blur(9px);
+      opacity: .9;
+      transform: rotate(-7deg);
+      animation: entity-fog-drift 22s ease-in-out infinite alternate;
+    }
+    .board-wings::after {
+      background: repeating-radial-gradient(ellipse at 82% 62%,
+        transparent 0 28px, rgba(110, 30, 45, .09) 42px, transparent 68px);
+      transform: rotate(8deg) scale(1.08);
+      animation-duration: 29s;
+      animation-direction: alternate-reverse;
+    }
+    /* Keep the fog decorative only; it never intercepts controls or popup animations. */
+    .board-wings { pointer-events: none; }
+    @keyframes entity-fog-drift {
+      from { translate: -1.5% 0; scale: 1; }
+      to { translate: 1.5% -2%; scale: 1.04; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .board-wings::before, .board-wings::after { animation: none !important; }
+    }
   </style>
 </head>
+
 <body class="live-overlay">
+
   <main class="live-shell" aria-label="The Entity Championship live overlay">
+
     <header class="toss-banner" id="toss-banner" aria-live="polite">
+
       <span class="toss-banner-mark" aria-hidden="true">✦</span>
+
       <span class="toss-banner-label">TOSS WINNER</span>
+
       <img class="mini-logo" id="toss-img" alt="" hidden><strong id="toss-winner-name">Awaiting toss</strong>
+
       <span class="toss-banner-advantage" id="toss-advantage">FIRST MAP BAN</span>
+
     </header>
 
+
+
     <section class="scoreboard" id="scoreboard" aria-live="polite">
+
       <div class="board-wings" aria-hidden="true"></div>
+
       <div class="score-meta">
+
         <span id="round-label">AWAITING MATCH</span>
+
         <span class="meta-divider">◆</span>
+
         <span id="match-state">NOT STARTED</span>
+
         <span class="meta-divider">◆</span>
+
         <span id="match-number">MATCH —</span>
+
       </div>
+
+
 
       <div class="teams-score">
+
         <div class="live-team a" id="team-a-panel">
+
           <div class="side-label">TEAM A</div>
+
           <div class="team-logo" id="team-a-logo"><img id="team-a-img" alt="" hidden></div>
+
           <div class="team-name" id="team-a-name">Waiting for teams</div>
+
           <div class="team-role" id="team-a-role" data-role="none">AWAITING ROLE</div>
+
           <div class="team-status" id="team-a-status">No active match</div>
+
           <div class="score" id="team-a-score">—</div>
+
         </div>
+
         <div class="versus">
+
           <div class="vs">VS</div>
+
           <div class="round" id="match-round">ENTITY<br>CHAMPIONSHIP</div>
+
         </div>
+
         <div class="live-team b" id="team-b-panel">
+
           <div class="side-label">TEAM B</div>
+
           <div class="team-logo" id="team-b-logo"><img id="team-b-img" alt="" hidden></div>
+
           <div class="team-name" id="team-b-name">Waiting for teams</div>
+
           <div class="team-role" id="team-b-role" data-role="none">AWAITING ROLE</div>
+
           <div class="team-status" id="team-b-status">No active match</div>
+
           <div class="score" id="team-b-score">—</div>
+
         </div>
+
       </div>
+
+
 
       <div class="score-extras">
+
         <span>MAP <b id="selected-map">NOT SELECTED</b></span>
+
         <span class="winner-detail" id="winner-detail">WINNER · PENDING</span>
+
       </div>
 
+
+
       <div class="side-swap" id="side-swap" aria-hidden="true">
+
         <div class="ss-lane ss-a"><img class="ss-logo" id="ss-a-img" alt="" hidden><b id="ss-a-name"></b><span id="ss-a-role"></span></div>
+
         <div class="ss-mid"><i>⇄</i><em>SIDES SWAP</em></div>
+
         <div class="ss-lane ss-b"><img class="ss-logo" id="ss-b-img" alt="" hidden><b id="ss-b-name"></b><span id="ss-b-role"></span></div>
+
       </div>
+
     </section>
 
 
+
+
+
     <div class="point-popups point-popups-a" id="score-popups-a" aria-live="polite" aria-label="Team A points awarded"></div>
+
     <div class="point-popups point-popups-b" id="score-popups-b" aria-live="polite" aria-label="Team B points awarded"></div>
 
+
+
     <div class="win-celebration" id="win-celebration" hidden aria-live="assertive">
+
       <div class="win-particles" id="win-particles" aria-hidden="true"></div>
+
       <div class="win-card">
+
         <img class="win-logo" id="celebration-img" alt="" hidden>
+
         <div class="win-kicker"><span></span> THE ENTITY HAS CHOSEN <span></span></div>
+
         <div class="win-title">MATCH WINNER</div>
+
         <div class="win-name" id="celebration-winner">TEAM NAME</div>
+
         <div class="win-subtitle">VICTORY CONFIRMED</div>
+
       </div>
+
     </div>
+
   </main>
 
+
+
   <script>
+
     (() => {
+
       'use strict';
+
       const $ = (id) => document.getElementById(id);
+
       const params = new URLSearchParams(location.search);
+
       let previous = null;
 
+
+
       function selectedMatch(state) {
+
         const requested = params.get('match');
+
         if (requested) {
+
           const exact = state.matches.find((match) => match.id === requested);
+
           if (exact) return exact;
+
         }
+
         return Entity.activeMatch(state);
+
       }
+
+
 
       function paintRole(teamKey, role, animate) {
+
         const panel = $('team-' + teamKey + '-panel');
+
         const badge = $('team-' + teamKey + '-role');
+
         panel.dataset.role = role.toLowerCase();
+
         badge.dataset.role = role.toLowerCase();
+
         badge.textContent = role;
+
         if (animate) {
+
           badge.classList.remove('role-flip');
+
           panel.classList.remove('role-changing', 'swapping');
+
           void badge.offsetWidth;
+
           badge.classList.add('role-flip');
+
           panel.classList.add('role-changing', 'swapping');
+
           window.setTimeout(() => {
+
             badge.classList.remove('role-flip');
+
             panel.classList.remove('role-changing', 'swapping');
+
           }, 700);
+
         }
+
       }
+
+
 
       function renderRoles(state) {
+
         if (!window.Entity || !state || !Array.isArray(state.matches)) return;
+
         const match = selectedMatch(state);
+
         if (!match || !match.teamAId || !match.teamBId) {
+
           $('team-a-role').textContent = 'AWAITING ROLE';
+
           $('team-b-role').textContent = 'AWAITING ROLE';
+
           $('team-a-panel').dataset.role = 'none';
+
           $('team-b-panel').dataset.role = 'none';
+
           previous = null;
+
           return;
+
         }
 
+
+
         // Game 1: A is Killer. Once Game 1 is confirmed, the scoring menu
+
         // moves to Game 2: B is Killer. This follows the existing saved schema.
+
         const card = match.scorecard || {};
+
         const game1 = card.game1 || {};
+
         const game2 = card.game2 || {};
+
         const gameNo = (game1.confirmed || game2.started || game2.confirmed) ? 2 : 1;
+
         const roleA = gameNo === 1 ? 'KILLER' : 'SURVIVOR';
+
         const roleB = gameNo === 1 ? 'SURVIVOR' : 'KILLER';
+
         const animate = Boolean(previous && previous.matchId === match.id &&
+
           (previous.roleA !== roleA || previous.roleB !== roleB));
 
+
+
         paintRole('a', roleA, animate && previous.roleA !== roleA);
+
         paintRole('b', roleB, animate && previous.roleB !== roleB);
+
         if (animate && window.sideSwapStinger) window.sideSwapStinger(roleA, roleB);
+
         previous = { matchId: match.id, roleA, roleB, gameNo };
+
       }
 
+
+
       window.addEventListener('load', () => {
+
         if (!window.Entity) return;
+
         Entity.subscribe(renderRoles);
+
         renderRoles(Entity.load());
+
       }, { once: true });
+
     })();
+
   </script>
+
+
+
 
 
   <script id="align-award-popups-to-docked-panel">
+
     (() => {
+
       const panel = document.getElementById('scoreboard');
+
       const shell = document.querySelector('.live-shell');
+
       const popups = [
+
         document.getElementById('score-popups-a'),
+
         document.getElementById('score-popups-b')
+
       ];
+
       if (!panel || !shell || popups.some((el) => !el)) return;
 
+
+
       const align = () => {
+
         const panelRect = panel.getBoundingClientRect();
+
         const shellRect = shell.getBoundingClientRect();
+
         const centerY = panelRect.top - shellRect.top + panelRect.height / 2;
+
         for (const popup of popups) {
+
           popup.style.top = `${centerY}px`;
+
           popup.style.bottom = 'auto';
+
         }
+
       };
+
+
 
       if ('ResizeObserver' in window) {
+
         const observer = new ResizeObserver(align);
+
         observer.observe(panel);
+
       }
+
       window.addEventListener('resize', align, { passive: true });
+
       window.addEventListener('load', align, { once: true });
+
       requestAnimationFrame(align);
+
     })();
+
   </script>
+
+
 
   <script id="live-polish-js">
+
     (() => {
+
       const $ = (id) => document.getElementById(id);
+
       let swapTimer;
+
       window.sideSwapStinger = (roleA, roleB) => {
+
         const el = $('side-swap'); if (!el) return;
-        $('ss-a-name').textContent =$('team-a-name').textContent; $('ss-b-name').textContent =$('team-b-name').textContent;
+
+        $('ss-a-name').textContent = $('team-a-name').textContent; $('ss-b-name').textContent = $('team-b-name').textContent;
+
         for (const [k, r] of [['a', roleA], ['b', roleB]]) { const s = $('ss-' + k + '-role'); s.textContent = '→ ' + r; s.dataset.role = r.toLowerCase(); }
+
         el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+
         clearTimeout(swapTimer); swapTimer = setTimeout(() => el.classList.remove('on'), 2950);
+
       };
+
       // Preview without waiting for real data: add ?preview=swap to the URL, or run previewSideSwap() in the console.
+
       window.previewSideSwap = () => {
+
         const aKiller = $('team-a-role').dataset.role === 'killer';
+
         const [a, b] = aKiller ? ['SURVIVOR', 'KILLER'] : ['KILLER', 'SURVIVOR'];
+
         for (const k of ['a', 'b']) { const p = $('team-' + k + '-panel'); p.classList.remove('swapping'); void p.offsetWidth; p.classList.add('swapping'); setTimeout(() => p.classList.remove('swapping'), 1500); }
+
         window.sideSwapStinger(a, b);
+
       };
+
       if (new URLSearchParams(location.search).get('preview') === 'swap') setTimeout(window.previewSideSwap, 1500);
 
+
+
       const num = (t) => parseInt(String(t).replace(/[^\d-]/g, ''), 10);
+
       const lead = () => {
+
         const a = num($('team-a-score').textContent), b = num($('team-b-score').textContent);
-        $('team-a-panel').classList.toggle('leading', a > b);$('team-b-panel').classList.toggle('leading', b > a);
+
+        $('team-a-panel').classList.toggle('leading', a > b); $('team-b-panel').classList.toggle('leading', b > a);
+
       };
+
       const watch = (id, cls, onChange) => {
+
         const el = $(id); if (!el) return; let last = el.textContent;
+
         el.addEventListener('animationend', (e) => { if (e.target === el) el.classList.remove(cls); });
+
         new MutationObserver(() => {
+
           const now = el.textContent; if (now === last) return; const old = last; last = now;
+
           el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+
           if (onChange) onChange(now, old); lead();
+
         }).observe(el, { childList: true, characterData: true, subtree: true });
+
       };
+
       const scored = (k) => (now, old) => {
+
         if (!(num(now) > num(old))) return;
+
         const p = $('team-' + k + '-panel'); p.classList.remove('scored'); void p.offsetWidth; p.classList.add('scored');
+
         setTimeout(() => p.classList.remove('scored'), 1000);
+
       };
+
       window.addEventListener('load', () => {
+
         watch('team-a-score', 'lp-bump', scored('a')); watch('team-b-score', 'lp-bump', scored('b'));
+
         ['team-a-name','team-b-name','selected-map','toss-winner-name','round-label','match-state','match-number','winner-detail'].forEach((id) => watch(id, 'lp-tick'));
+
         lead();
+
       }, { once: true });
+
     })();
+
   </script>
+
   <script id="live-logos-js">
+
     (() => {
+
       /* ===== CONFIG ===== */
+
       // Where the logos live. Tried in order until one loads (the working folder is remembered).
+
       // "/Images/" = project root on the deployed site, "../Images/" = one level up from this page.
+
       const LOGO_DIRS = ['/Images/', '../Images/', 'Images/', '/images/', '../images/', 'images/'];
+
       const TEAMS = {                    // key = a word in the team's name (any case) → logo file + accent colour (r,g,b)
+
         boys:     { file: 'Boys.png',     acc: '245,197,24'  },
+
         eternity: { file: 'eternity.png', acc: '139,123,255' },
+
         hakle:    { file: 'Hakle.png',    acc: '255,59,59'   },
+
         nicesu:   { file: 'Nicesu.png',   acc: '255,162,26'  },
+
         onyx:     { file: 'Onyx.png',     acc: '166,120,255' },
+
         vibes:    { file: 'Vibes.png',    acc: '255,63,180'  },
+
         vrty:     { file: 'Vrty.png',     acc: '61,242,192'  },
+
         yo:       { file: 'Yo.png',       acc: '255,122,46'  }
+
       };
+
       /* ================== */
+
       const $ = (id) => document.getElementById(id);
+
       const find = (name) => { for (const t of String(name || '').toLowerCase().split(/[^a-z0-9]+/)) if (t && TEAMS[t]) return TEAMS[t]; return null; };
 
+
+
       // Tries every folder and name casing (Boys.png / boys.png / BOYS.png) until the image really loads.
+
       const cache = new Map(); let goodDir = null;
+
       const variants = (f) => { const b = f.replace(/\.\w+$/, ''); return [...new Set([f, b[0].toUpperCase() + b.slice(1).toLowerCase() + '.png', b.toLowerCase() + '.png', b.toUpperCase() + '.png'])]; };
+
       const probe = (u) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(true); i.onerror = () => ok(false); i.src = u; });
+
       function resolveLogo(team) {
+
         if (!cache.has(team.file)) cache.set(team.file, (async () => {
+
           for (const d of [goodDir, ...LOGO_DIRS].filter((x, i, a) => x && a.indexOf(x) === i))
+
             for (const n of variants(team.file)) { const u = encodeURI(d + n); if (await probe(u)) { goodDir = d; return u; } }
+
           console.warn('[logos] not found:', team.file, '— tried folders', LOGO_DIRS); return null;
+
         })());
+
         return cache.get(team.file);
-      }
-      // Other scripts on the page (e.g. live-page.js) may also write to these <img> elements and set a wrong path.
-      // Once we know the working URL we "lock" it: if anything else changes src, we put the good one back.
-      function lock(img) {
-        if (img._locked) return; img._locked = true;
-        new MutationObserver(() => { const g = img.dataset.good; if (g && img.getAttribute('src') !== g) { console.warn('[logos] src was overwritten with', img.getAttribute('src'), '— restoring', g); img.setAttribute('src', g); } })
-          .observe(img, { attributes: true, attributeFilter: ['src'] });
-      }
-      async function setImg(img, team, done) {
-        if (!img) return;
-        if (!team) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); img.dataset.want = ''; if (done) done(false); return; }
-        img.dataset.want = team.file;
-        const u = await resolveLogo(team);
-        if (img.dataset.want !== team.file) return;          // the name changed while we were loading
-        if (!u) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); if (done) done(false); return; }
-        img.dataset.good = u; lock(img);
-        if (img.getAttribute('src') !== u) img.setAttribute('src', u);
-        img.hidden = false; if (done) done(true);
-      }
-      function watchText(id, fn) {
-        const el = $(id); if (!el) return; let last;
-        const run = () => { const t = el.textContent; if (t === last) return; last = t; fn(find(t)); };
-        new MutationObserver(run).observe(el, { childList: true, characterData: true, subtree: true }); run();
+
       }
 
-      for (const k of ['a', 'b']) {
-        const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap =$('team-' + k + '-logo');
-        watchText('team-' + k + '-name', (team) => {
-          if (team) panel.style.setProperty('--acc-rgb', team.acc); else panel.style.removeProperty('--acc-rgb');
-          setImg(img, team, (ok) => {
-            panel.classList.toggle('has-logo', ok);
-            if (ok) { wrap.classList.remove('logo-in'); void wrap.offsetWidth; wrap.classList.add('logo-in'); }
-          });
-        });
+      // Other scripts on the page (e.g. live-page.js) may also write to these <img> elements and set a wrong path.
+
+      // Once we know the working URL we "lock" it: if anything else changes src, we put the good one back.
+
+      function lock(img) {
+
+        if (img._locked) return; img._locked = true;
+
+        new MutationObserver(() => { const g = img.dataset.good; if (g && img.getAttribute('src') !== g) { console.warn('[logos] src was overwritten with', img.getAttribute('src'), '— restoring', g); img.setAttribute('src', g); } })
+
+          .observe(img, { attributes: true, attributeFilter: ['src'] });
+
       }
+
+      async function setImg(img, team, done) {
+
+        if (!img) return;
+
+        if (!team) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); img.dataset.want = ''; if (done) done(false); return; }
+
+        img.dataset.want = team.file;
+
+        const u = await resolveLogo(team);
+
+        if (img.dataset.want !== team.file) return;          // the name changed while we were loading
+
+        if (!u) { img.dataset.good = ''; img.hidden = true; img.removeAttribute('src'); if (done) done(false); return; }
+
+        img.dataset.good = u; lock(img);
+
+        if (img.getAttribute('src') !== u) img.setAttribute('src', u);
+
+        img.hidden = false; if (done) done(true);
+
+      }
+
+      function watchText(id, fn) {
+
+        const el = $(id); if (!el) return; let last;
+
+        const run = () => { const t = el.textContent; if (t === last) return; last = t; fn(find(t)); };
+
+        new MutationObserver(run).observe(el, { childList: true, characterData: true, subtree: true }); run();
+
+      }
+
+
+
+      for (const k of ['a', 'b']) {
+
+        const panel = $('team-' + k + '-panel'), img = $('team-' + k + '-img'), wrap = $('team-' + k + '-logo');
+
+        watchText('team-' + k + '-name', (team) => {
+
+          if (team) panel.style.setProperty('--acc-rgb', team.acc); else panel.style.removeProperty('--acc-rgb');
+
+          setImg(img, team, (ok) => {
+
+            panel.classList.toggle('has-logo', ok);
+
+            if (ok) { wrap.classList.remove('logo-in'); void wrap.offsetWidth; wrap.classList.add('logo-in'); }
+
+          });
+
+        });
+
+      }
+
       watchText('toss-winner-name', (team) => setImg($('toss-img'), team));
-      watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok)$('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
+
+      watchText('celebration-winner', (team) => setImg($('celebration-img'), team, (ok) => { if (ok) $('celebration-img').style.setProperty('--acc-rgb', team.acc); }));
+
+
+
 
 
       if (new URLSearchParams(location.search).get('logos') === 'debug') {
+
         const box = Object.assign(document.createElement('pre'), { style: 'position:fixed;top:8px;left:8px;z-index:99999;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;max-width:90vw;white-space:pre-wrap' });
+
         document.body.appendChild(box);
+
         const show = () => { box.textContent = ['team-a-img', 'team-b-img', 'toss-img', 'celebration-img'].map((id) => { const i = $(id); return id + ': ' + (i ? (i.getAttribute('src') || '(no src)') + (i.complete && i.naturalWidth ? '  OK ' + i.naturalWidth + 'px' : '  NOT LOADED') : 'missing element'); }).join('\n') + '\nfolders tried: ' + LOGO_DIRS.join('  '); };
+
         setInterval(show, 700); show();
+
       }
+
       const swap = window.sideSwapStinger;   // add logos to the side-swap stinger
+
       window.sideSwapStinger = (a, b) => {
+
         setImg($('ss-a-img'), find($('team-a-name').textContent)); setImg($('ss-b-img'), find($('team-b-name').textContent));
+
         if (swap) swap(a, b);
+
       };
+
     })();
+
   </script>
+
 </body>
+
 </html>
