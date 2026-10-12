@@ -735,6 +735,65 @@
       .board-wings::before, .board-wings::after { animation: none !important; }
     }
   </style>
+
+  <style id="entity-fog-wing-effect">
+    /* Entity fog wings: opaque enough to mask spectator HUD, atmospheric at the edges. */
+    body.live-overlay .live-shell::before,
+    body.live-overlay .live-shell::after {
+      content: "";
+      position: fixed;
+      bottom: 0;
+      width: max(7vw, 54px);
+      height: clamp(150px, 24vh, 270px);
+      z-index: 4;
+      pointer-events: none;
+      overflow: hidden;
+      background-color: #08080c;
+      background-image:
+        radial-gradient(ellipse at 35% 82%, rgba(225,29,46,.42) 0%, transparent 54%),
+        radial-gradient(ellipse at 75% 54%, rgba(105,24,40,.38) 0%, transparent 60%),
+        radial-gradient(ellipse at 45% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
+        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
+      background-size: 180% 160%, 160% 170%, 190% 180%, 100% 100%;
+      border-top: 1px solid rgba(160,150,165,.45);
+      box-shadow: 0 -16px 36px rgba(0,0,0,.55), inset 0 2px 0 rgba(225,29,46,.4);
+      animation: entity-fog-drift 12s ease-in-out infinite alternate;
+    }
+    body.live-overlay .live-shell::before {
+      left: 0;
+      border-right: 1px solid rgba(225,29,46,.38);
+      background-image:
+        radial-gradient(ellipse at 25% 72%, rgba(225,29,46,.46) 0%, transparent 58%),
+        radial-gradient(ellipse at 80% 45%, rgba(95,22,38,.40) 0%, transparent 60%),
+        radial-gradient(ellipse at 45% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
+        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
+    }
+    body.live-overlay .live-shell::after {
+      right: 0;
+      border-left: 1px solid rgba(112,232,244,.38);
+      box-shadow: 0 -16px 36px rgba(0,0,0,.55), inset 0 2px 0 rgba(112,232,244,.35);
+      background-image:
+        radial-gradient(ellipse at 75% 72%, rgba(112,232,244,.28) 0%, transparent 58%),
+        radial-gradient(ellipse at 20% 48%, rgba(35,90,105,.36) 0%, transparent 60%),
+        radial-gradient(ellipse at 55% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
+        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
+      animation-delay: -5s;
+    }
+    @keyframes entity-fog-drift {
+      0% { background-position: 0% 45%, 100% 55%, 40% 35%, 0 0; filter: brightness(.92); }
+      50% { background-position: 80% 60%, 15% 40%, 65% 55%, 0 0; filter: brightness(1.08); }
+      100% { background-position: 25% 30%, 75% 70%, 30% 45%, 0 0; filter: brightness(.98); }
+    }
+    @media (max-width: 850px) {
+      body.live-overlay .live-shell::before,
+      body.live-overlay .live-shell::after { width: 28px; height: 156px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.live-overlay .live-shell::before,
+      body.live-overlay .live-shell::after { animation: none !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
