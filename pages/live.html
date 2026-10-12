@@ -1038,6 +1038,215 @@
     }
   </style>
 
+
+  <style id="entity-mesmerising-redesign">
+    /* ENTITY CHAMPIONSHIP — cinematic split-panel redesign */
+    :root {
+      --ec-red: 255, 55, 78;
+      --ec-cyan: 84, 231, 246;
+      --ec-gold: 244, 201, 93;
+    }
+
+    body.live-overlay .live-shell {
+      width: 100% !important;
+      max-width: none !important;
+    }
+
+    body.live-overlay .scoreboard {
+      filter: drop-shadow(0 -10px 28px rgba(0,0,0,.38));
+    }
+
+    body.live-overlay .teams-score {
+      gap: clamp(18px, 5.6vw, 112px) !important;
+      padding-inline: clamp(10px, 1.7vw, 28px) !important;
+    }
+
+    body.live-overlay .live-team {
+      isolation: isolate;
+      border: 1px solid rgba(220,225,240,.17) !important;
+      border-radius: 2px;
+      transform: translateZ(0);
+      box-shadow:
+        0 16px 40px rgba(0,0,0,.48),
+        inset 0 1px 0 rgba(255,255,255,.12),
+        inset 0 3px 0 rgba(var(--c),1),
+        inset 0 -2px 0 rgba(var(--acc-rgb,120,120,132),.9) !important;
+      transition: box-shadow .45s ease, filter .45s ease, border-color .45s ease;
+    }
+
+    body.live-overlay .live-team.a {
+      clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 0 100%);
+      background-color: #09080d !important;
+      background-image:
+        linear-gradient(110deg, rgba(var(--ec-red),.20), transparent 58%),
+        linear-gradient(0deg, rgba(0,0,0,.22), transparent 65%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 12px),
+        linear-gradient(180deg, #171018 0%, #08080c 100%) !important;
+    }
+
+    body.live-overlay .live-team.b {
+      clip-path: polygon(0 30px, 30px 0, 100% 0, 100% 100%, 0 100%);
+      background-color: #070b10 !important;
+      background-image:
+        linear-gradient(250deg, rgba(var(--ec-cyan),.18), transparent 58%),
+        linear-gradient(0deg, rgba(0,0,0,.22), transparent 65%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 1px, transparent 1px 12px),
+        linear-gradient(180deg, #0d171c 0%, #07080c 100%) !important;
+    }
+
+    /* Moving ambient light stays behind all live data. */
+    body.live-overlay .live-team::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: .78;
+      background:
+        linear-gradient(115deg, transparent 0 38%, rgba(255,255,255,.035) 48%, transparent 58%),
+        radial-gradient(ellipse at 50% 120%, rgba(var(--c),.23), transparent 58%);
+      background-size: 220% 100%, 100% 100%;
+      animation: ec-ambient-drift 10s ease-in-out infinite alternate;
+    }
+
+    body.live-overlay .live-team.a::before {
+      border-left: 3px solid rgba(var(--ec-red),.92);
+      background-position: 0 0, 0 0;
+    }
+
+    body.live-overlay .live-team.b::before {
+      border-right: 3px solid rgba(var(--ec-cyan),.92);
+      background-position: 100% 0, 0 0;
+      animation-delay: -4s;
+    }
+
+    /* Content is kept above the texture; no center VS element is reintroduced. */
+    body.live-overlay .live-team .side-label,
+    body.live-overlay .live-team .team-name,
+    body.live-overlay .live-team .team-role,
+    body.live-overlay .live-team .team-status {
+      position: relative;
+      z-index: 4;
+    }
+
+    body.live-overlay .live-team .side-label {
+      color: rgba(222,222,235,.68);
+      font-size: clamp(.52rem, .65vw, .7rem);
+      letter-spacing: .28em;
+      text-shadow: 0 2px 8px #000;
+    }
+
+    body.live-overlay .live-team .team-name {
+      max-width: 88%;
+      margin-top: clamp(6px, .9vh, 11px) !important;
+      margin-bottom: 8px !important;
+      font-size: clamp(1.25rem, 2.65vw, 3rem) !important;
+      letter-spacing: .055em;
+      line-height: .96;
+      text-shadow: 0 0 18px rgba(255,255,255,.13), 0 3px 10px rgba(0,0,0,.9);
+    }
+
+    body.live-overlay .live-team .team-role {
+      min-height: 24px;
+      padding: 5px 11px;
+      border-width: 1px;
+      letter-spacing: .18em;
+      box-shadow: 0 0 18px rgba(var(--c),.12), inset 0 0 12px rgba(var(--c),.05);
+    }
+
+    body.live-overlay .live-team .team-status {
+      margin-top: 8px;
+      color: rgba(222,222,235,.62);
+      font-size: clamp(.45rem, .55vw, .6rem);
+      letter-spacing: .17em;
+    }
+
+    body.live-overlay .live-team .score {
+      z-index: 5;
+      font-size: clamp(2.8rem, 6.2vh, 4.8rem) !important;
+      line-height: .85;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 18px rgba(var(--c),.35), 0 4px 14px rgba(0,0,0,.9);
+    }
+
+    body.live-overlay .live-team.leading {
+      border-color: rgba(var(--c),.55) !important;
+      filter: brightness(1.08);
+      box-shadow:
+        0 0 26px rgba(var(--c),.15),
+        0 16px 40px rgba(0,0,0,.48),
+        inset 0 1px 0 rgba(255,255,255,.15),
+        inset 0 3px 0 rgba(var(--c),1),
+        inset 0 -2px 0 rgba(var(--acc-rgb,120,120,132),.9) !important;
+    }
+
+    body.live-overlay .live-team.leading .score {
+      text-shadow: 0 0 28px rgba(var(--c),.6), 0 4px 14px rgba(0,0,0,.9);
+    }
+
+    /* Short energy sweep on scoring; existing JS triggers .scored. */
+    body.live-overlay .live-team.scored::after {
+      z-index: 2;
+      opacity: 1;
+      background:
+        linear-gradient(105deg, transparent 22%, rgba(255,255,255,.28) 48%, transparent 68%),
+        radial-gradient(ellipse at 50% 100%, rgba(var(--c),.45), transparent 70%) !important;
+      animation: ec-score-surge .95s ease-out both !important;
+    }
+
+    @keyframes ec-ambient-drift {
+      0% { background-position: -40% 0, 0 0; }
+      100% { background-position: 40% 0, 0 0; }
+    }
+
+    @keyframes ec-score-surge {
+      0% { opacity: 0; transform: translateX(-18%); }
+      24% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(18%); }
+    }
+
+    /* A fine glowing rail along the upper edge ties the two panels together visually. */
+    body.live-overlay .live-team::marker { content: none; }
+
+    body.live-overlay .live-team.a {
+      border-top-color: rgba(var(--ec-red),.52) !important;
+    }
+
+    body.live-overlay .live-team.b {
+      border-top-color: rgba(var(--ec-cyan),.52) !important;
+    }
+
+    /* Make the toss banner feel like a compact broadcast callout. */
+    body.live-overlay .toss-banner {
+      border: 1px solid rgba(244,201,93,.48);
+      box-shadow: 0 8px 28px rgba(0,0,0,.35), inset 0 1px rgba(255,255,255,.06);
+      background: linear-gradient(135deg, rgba(14,13,19,.96), rgba(5,5,8,.94));
+      backdrop-filter: blur(8px);
+    }
+
+    body.live-overlay .toss-banner strong {
+      text-shadow: 0 0 18px rgba(244,201,93,.28);
+    }
+
+    @media (max-width: 850px) {
+      body.live-overlay .teams-score {
+        gap: 14px !important;
+        padding-inline: 8px !important;
+      }
+      body.live-overlay .live-team.a {
+        clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+      }
+      body.live-overlay .live-team.b {
+        clip-path: polygon(0 18px, 18px 0, 100% 0, 100% 100%, 0 100%);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body.live-overlay .live-team::before { animation: none !important; }
+      body.live-overlay .live-team.scored::after { animation: none !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
