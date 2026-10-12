@@ -1204,6 +1204,68 @@
     }
   </style>
 
+
+  <style id="inner-edge-score-size-pass">
+    /* Larger split panels, with the scores moved into the open inner corners shown in the reference. */
+    body.live-overlay .teams-score {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+      gap: clamp(22px, 4vw, 82px) !important;
+      padding: 0 clamp(18px, 2vw, 34px) !important;
+      align-items: stretch !important;
+    }
+
+    body.live-overlay .live-team {
+      height: clamp(210px, 24vh, 268px) !important;
+    }
+
+    /* Team A score sits at the inner right; Team B mirrors it at the inner left. */
+    body.live-overlay .live-team.a .score {
+      left: auto !important;
+      right: clamp(20px, 2.4vw, 42px) !important;
+      width: auto !important;
+      top: 50% !important;
+      bottom: auto !important;
+      transform: translateY(-50%);
+      font-size: clamp(3.8rem, 7.5vh, 5.8rem) !important;
+      line-height: .9 !important;
+      text-align: right !important;
+      z-index: 4 !important;
+      text-shadow: 0 0 22px rgba(112,232,244,.22), 0 0 42px rgba(255,255,255,.08);
+    }
+
+    body.live-overlay .live-team.b .score {
+      right: auto !important;
+      left: clamp(20px, 2.4vw, 42px) !important;
+      width: auto !important;
+      top: 50% !important;
+      bottom: auto !important;
+      transform: translateY(-50%);
+      font-size: clamp(3.8rem, 7.5vh, 5.8rem) !important;
+      line-height: .9 !important;
+      text-align: left !important;
+      z-index: 4 !important;
+      text-shadow: 0 0 22px rgba(255,70,85,.18), 0 0 42px rgba(255,255,255,.08);
+    }
+
+    @media (max-width: 850px) {
+      body.live-overlay .teams-score { gap: clamp(14px, 3vw, 28px) !important; padding: 0 12px !important; }
+      body.live-overlay .live-team { height: 176px !important; }
+      body.live-overlay .live-team.a .score { right: 14px !important; font-size: clamp(3rem, 7vw, 4.2rem) !important; }
+      body.live-overlay .live-team.b .score { left: 14px !important; font-size: clamp(3rem, 7vw, 4.2rem) !important; }
+    }
+
+    @media (max-width: 520px) {
+      body.live-overlay .teams-score { gap: 8px !important; padding: 0 5px !important; }
+      body.live-overlay .live-team { height: 144px !important; }
+      body.live-overlay .live-team.a .score { right: 7px !important; font-size: clamp(2.3rem, 9vw, 3rem) !important; }
+      body.live-overlay .live-team.b .score { left: 7px !important; font-size: clamp(2.3rem, 9vw, 3rem) !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body.live-overlay .live-team::before { animation: none !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
