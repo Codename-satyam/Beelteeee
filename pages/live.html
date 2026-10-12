@@ -1427,6 +1427,66 @@
       }
     }
   </style>
+
+  <style id="compact-panels-final">
+    /* Compact the two bottom team panels while preserving the split layout. */
+    body.live-overlay .teams-score {
+      gap: clamp(16px, 3.2vw, 58px) !important;
+      padding: 0 clamp(14px, 1.8vw, 28px) !important;
+    }
+    body.live-overlay .live-team {
+      height: clamp(150px, 17vh, 190px) !important;
+      padding: 11px clamp(12px, 1.5vw, 22px) 52px !important;
+    }
+    body.live-overlay .live-team .team-name {
+      font-size: clamp(1.25rem, 2.35vw, 2.65rem) !important;
+      margin: 5px 0 5px !important;
+    }
+    body.live-overlay .live-team .score {
+      font-size: clamp(3rem, 6.2vh, 4.8rem) !important;
+    }
+    body.live-overlay .live-team.a .score {
+      right: clamp(14px, 1.8vw, 30px) !important;
+    }
+    body.live-overlay .live-team.b .score {
+      left: clamp(14px, 1.8vw, 30px) !important;
+    }
+    body.live-overlay .live-team .team-role {
+      min-height: 20px !important;
+      margin: 2px 0 5px !important;
+      padding: 4px 9px !important;
+    }
+    @media (max-width: 850px) {
+      body.live-overlay .teams-score {
+        gap: 12px !important;
+        padding: 0 10px !important;
+      }
+      body.live-overlay .live-team {
+        height: 138px !important;
+        padding: 9px 8px 45px !important;
+      }
+      body.live-overlay .live-team .team-name {
+        font-size: clamp(1rem, 2.8vw, 1.6rem) !important;
+      }
+      body.live-overlay .live-team.a .score {
+        right: 10px !important;
+        font-size: clamp(2.8rem, 6.5vw, 3.8rem) !important;
+      }
+      body.live-overlay .live-team.b .score {
+        left: 10px !important;
+        font-size: clamp(2.8rem, 6.5vw, 3.8rem) !important;
+      }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .teams-score { gap: 8px !important; padding: 0 5px !important; }
+      body.live-overlay .live-team { height: 116px !important; padding: 7px 4px 38px !important; }
+      body.live-overlay .live-team .team-name { font-size: clamp(.78rem, 3.2vw, 1.05rem) !important; }
+      body.live-overlay .live-team.a .score { right: 6px !important; font-size: clamp(2rem, 8vw, 2.8rem) !important; }
+      body.live-overlay .live-team.b .score { left: 6px !important; font-size: clamp(2rem, 8vw, 2.8rem) !important; }
+      body.live-overlay .live-team .team-role { font-size: .4rem !important; padding: 3px 4px !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
