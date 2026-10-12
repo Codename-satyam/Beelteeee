@@ -3075,6 +3075,20 @@
       body.live-overlay .winner-detail::after { animation: none !important; }
     }
   </style>
+
+  <style id="swap-text-position-fix">
+    /* After the sides swap, team identity (label / name / role / status) must stay on the OUTER
+       half of each card and the score on the inner half. The base rules position these by team
+       letter (A = 29%, B = 67%), so they need a mirrored set while .sides-swapped is active. */
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .side-label,
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .team-name,
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .team-role,
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .team-status { left: 67% !important; right: auto !important; }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .side-label,
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .team-name,
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .team-role,
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .team-status { left: 29% !important; right: auto !important; }
+  </style>
 </body>
 
 </html>
