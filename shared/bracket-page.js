@@ -1,3 +1,4 @@
+
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
@@ -136,12 +137,15 @@
     const card = scoreEngine.normalizeScorecard(match.scorecard);
     const gameKey = scoringGameNo === 1 ? 'game1' : 'game2';
     const game = card[gameKey];
-    const otherGame = card[scoringGameNo === 1 ? 'game2' : 'game1'];
     const result = scoreEngine.calculateMatch(card);
     const roundResult = scoringGameNo === 1 ? result.game1 : result.game2;
+
+    // Game 1: Team B is Killer and Team A is Survivor.
+    // Game 2 swaps the roles: Team A is Killer and Team B is Survivor.
     const roles = scoringGameNo === 1
-      ? { killerId: match.teamAId, survivorId: match.teamBId }
-      : { killerId: match.teamBId, survivorId: match.teamAId };
+      ? { killerId: match.teamBId, survivorId: match.teamAId }
+      : { killerId: match.teamAId, survivorId: match.teamBId };
+
     const killerName = Entity.teamName(state, roles.killerId);
     const survivorName = Entity.teamName(state, roles.survivorId);
     const gameOneReady = card.game1.confirmed;
@@ -165,8 +169,8 @@
         <button type="button" class="modal-close" data-score-action="close" aria-label="Close scoring menu">×</button>
       </header>
       <div class="scoring-tabs">
-        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,match.teamAId))} Killer · ${esc(Entity.teamName(state,match.teamBId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}</span></button>
-        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,match.teamBId))} Killer · ${esc(Entity.teamName(state,match.teamAId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,match.teamBId))} Killer · ${esc(Entity.teamName(state,match.teamAId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,match.teamAId))} Killer · ${esc(Entity.teamName(state,match.teamBId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}</span></button>
       </div>
       <div class="scoring-rule-strip"><span>SCORING IS ACTION-BASED</span><span>Survivor: max 18</span><span>Killer: max 19</span></div>
       <div class="scoring-role-heading"><span class="role-survivor">SURVIVOR</span><b>${esc(survivorName)}</b><span class="role-killer">KILLER</span><b>${esc(killerName)}</b></div>
