@@ -1782,21 +1782,68 @@
           window.resetTeamPanelSides();
         }
 
-        // Game 1: A is Killer. Once Game 1 is confirmed, the scoring menu
-
-        // moves to Game 2: B is Killer. This follows the existing saved schema.
-
+        // The bracket's saved role assignment is authoritative.
+        // Prefer team IDs (stable even if team names change), then saved names.
+        // Only use the legacy Game 1 / Game 2 convention when no role assignment
+        // exists on the match record.
         const card = match.scorecard || {};
-
         const game1 = card.game1 || {};
-
         const game2 = card.game2 || {};
-
         const gameNo = (game1.confirmed || game2.started || game2.confirmed) ? 2 : 1;
 
-        const roleA = gameNo === 1 ? 'KILLER' : 'SURVIVOR';
+        const teamAName = Entity.teamName(state, match.teamAId);
+        const teamBName = Entity.teamName(state, match.teamBId);
+        const norm = (value) => String(value ?? '').trim().toLowerCase();
 
-        const roleB = gameNo === 1 ? 'SURVIVOR' : 'KILLER';
+        const savedKillerId =
+          match.killerTeamId ??
+          match.roles?.killerTeamId ??
+          match.setup?.killerTeamId ??
+          null;
+        const savedSurvivorId =
+          match.survivorTeamId ??
+          match.roles?.survivorTeamId ??
+          match.setup?.survivorTeamId ??
+          null;
+
+        const savedKillerName =
+          match.killerTeam ??
+          match.killerTeamName ??
+          match.roles?.killerTeam ??
+          match.setup?.killerTeam ??
+          null;
+        const savedSurvivorName =
+          match.survivorTeam ??
+          match.survivorTeamName ??
+          match.roles?.survivorTeam ??
+          match.setup?.survivorTeam ??
+          null;
+
+        let killerIsA = null;
+        if (savedKillerId != null) {
+          if (savedKillerId === match.teamAId) killerIsA = true;
+          else if (savedKillerId === match.teamBId) killerIsA = false;
+        }
+        if (killerIsA == null && savedSurvivorId != null) {
+          if (savedSurvivorId === match.teamAId) killerIsA = false;
+          else if (savedSurvivorId === match.teamBId) killerIsA = true;
+        }
+        if (killerIsA == null && savedKillerName != null) {
+          const killerName = norm(savedKillerName);
+          if (killerName === norm(teamAName)) killerIsA = true;
+          else if (killerName === norm(teamBName)) killerIsA = false;
+        }
+        if (killerIsA == null && savedSurvivorName != null) {
+          const survivorName = norm(savedSurvivorName);
+          if (survivorName === norm(teamAName)) killerIsA = false;
+          else if (survivorName === norm(teamBName)) killerIsA = true;
+        }
+
+        // Backward-compatible fallback for older matches without saved roles.
+        if (killerIsA == null) killerIsA = gameNo === 1;
+
+        const roleA = killerIsA ? 'KILLER' : 'SURVIVOR';
+        const roleB = killerIsA ? 'SURVIVOR' : 'KILLER';
 
         const animate = Boolean(previous && previous.matchId === match.id &&
 
