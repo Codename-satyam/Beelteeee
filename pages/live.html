@@ -1487,6 +1487,61 @@
     }
   </style>
 
+
+  <style id="larger-bottom-toss-winner">
+    /* Larger toss-winner banner, docked at the bottom without changing scoreboard sizing. */
+    body.live-overlay .toss-banner {
+      position: fixed !important;
+      top: auto !important;
+      bottom: clamp(18px, 3vh, 36px) !important;
+      left: 50% !important;
+      right: auto !important;
+      transform: translateX(-50%) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: clamp(12px, 1.5vw, 22px) !important;
+      min-height: clamp(54px, 7vh, 78px) !important;
+      padding: clamp(12px, 1.6vh, 18px) clamp(24px, 3vw, 44px) !important;
+      max-width: min(94vw, 900px) !important;
+      box-sizing: border-box !important;
+      font-size: clamp(.78rem, 1vw, 1rem) !important;
+      letter-spacing: .14em !important;
+      z-index: 50 !important;
+      white-space: normal !important;
+      text-align: center !important;
+      box-shadow: 0 10px 35px rgba(0,0,0,.55), 0 0 24px rgba(244,201,93,.12) !important;
+    }
+    body.live-overlay .toss-banner strong {
+      font-size: clamp(1.35rem, 2vw, 2rem) !important;
+      line-height: 1.05 !important;
+    }
+    body.live-overlay .toss-banner .mini-logo {
+      width: clamp(36px, 4vw, 52px) !important;
+      height: clamp(36px, 4vw, 52px) !important;
+    }
+    @media (max-width: 850px) {
+      body.live-overlay .toss-banner {
+        bottom: 10px !important;
+        max-width: calc(100vw - 20px) !important;
+        gap: 8px !important;
+        padding: 10px 14px !important;
+      }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .toss-banner {
+        bottom: 8px !important;
+        min-height: 48px !important;
+        padding: 8px 10px !important;
+        gap: 6px !important;
+        font-size: .65rem !important;
+      }
+      body.live-overlay .toss-banner strong { font-size: 1.05rem !important; }
+      body.live-overlay .toss-banner .mini-logo { width: 28px !important; height: 28px !important; }
+      body.live-overlay .toss-banner-advantage { display: none !important; }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
