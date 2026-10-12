@@ -695,105 +695,85 @@
   </style>
 
 
-  <style id="entity-fog-privacy-wings">
-    /* Entity fog wings: opaque coverage for the lower left/right game HUD areas. */
-    .board-wings {
+  <style id="cyberpunk-extended-wings">
+    /* OPTION 1: angular cyberpunk wings extending the scoreboard to both viewport edges. */
+    body.live-overlay .scoreboard {
+      position: absolute !important;
       isolation: isolate;
-      overflow: hidden;
-      background:
-        radial-gradient(ellipse at 8% 78%, rgba(117, 12, 28, .42), transparent 38%),
-        radial-gradient(ellipse at 92% 78%, rgba(13, 105, 119, .28), transparent 38%),
-        linear-gradient(180deg, #111117 0%, #08080c 58%, #050507 100%) !important;
-      border-top: 1px solid rgba(255,255,255,.10);
+      overflow: visible !important;
+      background: linear-gradient(180deg, #14141b 0%, #08080d 58%, #050507 100%) !important;
     }
-    .board-wings::before, .board-wings::after {
+
+    body.live-overlay .board-wings {
+      position: absolute !important;
+      z-index: 0 !important;
+      top: 0;
+      bottom: 0;
+      left: calc(50% - 50vw) !important;
+      right: calc(50% - 50vw) !important;
+      overflow: hidden;
+      pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0 8%, rgba(225,29,46,.12) 8.2%, transparent 8.8% 21%, rgba(255,255,255,.025) 21.2%, transparent 22%),
+        linear-gradient(65deg, transparent 0 72%, rgba(112,232,244,.10) 72.2%, transparent 72.8% 89%, rgba(112,232,244,.035) 89.2%, transparent 90%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 2px, transparent 2px 18px),
+        radial-gradient(ellipse at 8% 70%, rgba(225,29,46,.20), transparent 34%),
+        radial-gradient(ellipse at 92% 70%, rgba(112,232,244,.16), transparent 34%),
+        linear-gradient(180deg, #14141b 0%, #09090e 60%, #050507 100%) !important;
+      border-top: 1px solid rgba(210,210,225,.22);
+      box-shadow: 0 -18px 50px rgba(0,0,0,.58);
+    }
+
+    /* Angular edge rails and small HUD-like cuts, kept behind scoreboard text. */
+    body.live-overlay .board-wings::before,
+    body.live-overlay .board-wings::after {
       content: "";
       position: absolute;
-      inset: -35% -12%;
-      pointer-events: none;
-      background: repeating-radial-gradient(ellipse at 18% 70%,
-        transparent 0 22px, rgba(175, 175, 195, .035) 34px, transparent 57px);
-      filter: blur(9px);
-      opacity: .9;
-      transform: rotate(-7deg);
-      animation: entity-fog-drift 22s ease-in-out infinite alternate;
-    }
-    .board-wings::after {
-      background: repeating-radial-gradient(ellipse at 82% 62%,
-        transparent 0 28px, rgba(110, 30, 45, .09) 42px, transparent 68px);
-      transform: rotate(8deg) scale(1.08);
-      animation-duration: 29s;
-      animation-direction: alternate-reverse;
-    }
-    /* Keep the fog decorative only; it never intercepts controls or popup animations. */
-    .board-wings { pointer-events: none; }
-    @keyframes entity-fog-drift {
-      from { translate: -1.5% 0; scale: 1; }
-      to { translate: 1.5% -2%; scale: 1.04; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .board-wings::before, .board-wings::after { animation: none !important; }
-    }
-  </style>
-
-  <style id="entity-fog-wing-effect">
-    /* Entity fog wings: opaque enough to mask spectator HUD, atmospheric at the edges. */
-    body.live-overlay .live-shell::before,
-    body.live-overlay .live-shell::after {
-      content: "";
-      position: fixed;
+      top: 0;
       bottom: 0;
-      width: max(7vw, 54px);
-      height: clamp(150px, 24vh, 270px);
-      z-index: 4;
+      width: min(34vw, 520px);
       pointer-events: none;
-      overflow: hidden;
-      background-color: #08080c;
-      background-image:
-        radial-gradient(ellipse at 35% 82%, rgba(225,29,46,.42) 0%, transparent 54%),
-        radial-gradient(ellipse at 75% 54%, rgba(105,24,40,.38) 0%, transparent 60%),
-        radial-gradient(ellipse at 45% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
-        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
-      background-size: 180% 160%, 160% 170%, 190% 180%, 100% 100%;
-      border-top: 1px solid rgba(160,150,165,.45);
-      box-shadow: 0 -16px 36px rgba(0,0,0,.55), inset 0 2px 0 rgba(225,29,46,.4);
-      animation: entity-fog-drift 12s ease-in-out infinite alternate;
+      opacity: .95;
     }
-    body.live-overlay .live-shell::before {
+    body.live-overlay .board-wings::before {
       left: 0;
+      background:
+        linear-gradient(90deg, rgba(225,29,46,.18), transparent 72%),
+        linear-gradient(135deg, transparent 0 18%, rgba(225,29,46,.35) 18.2% 18.6%, transparent 18.8% 36%, rgba(225,29,46,.14) 36.2% 36.5%, transparent 36.8%),
+        repeating-linear-gradient(0deg, transparent 0 28px, rgba(225,29,46,.08) 29px 30px, transparent 31px 46px);
       border-right: 1px solid rgba(225,29,46,.38);
-      background-image:
-        radial-gradient(ellipse at 25% 72%, rgba(225,29,46,.46) 0%, transparent 58%),
-        radial-gradient(ellipse at 80% 45%, rgba(95,22,38,.40) 0%, transparent 60%),
-        radial-gradient(ellipse at 45% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
-        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
+      clip-path: polygon(0 0, 100% 0, 93% 12%, 100% 22%, 92% 32%, 100% 44%, 92% 56%, 100% 68%, 93% 82%, 100% 100%, 0 100%);
     }
-    body.live-overlay .live-shell::after {
+    body.live-overlay .board-wings::after {
       right: 0;
-      border-left: 1px solid rgba(112,232,244,.38);
-      box-shadow: 0 -16px 36px rgba(0,0,0,.55), inset 0 2px 0 rgba(112,232,244,.35);
-      background-image:
-        radial-gradient(ellipse at 75% 72%, rgba(112,232,244,.28) 0%, transparent 58%),
-        radial-gradient(ellipse at 20% 48%, rgba(35,90,105,.36) 0%, transparent 60%),
-        radial-gradient(ellipse at 55% 25%, rgba(45,45,58,.72) 0%, transparent 68%),
-        linear-gradient(180deg, rgba(18,18,25,.97), rgba(5,5,8,.995));
-      animation-delay: -5s;
+      background:
+        linear-gradient(270deg, rgba(112,232,244,.14), transparent 72%),
+        linear-gradient(225deg, transparent 0 18%, rgba(112,232,244,.30) 18.2% 18.6%, transparent 18.8% 36%, rgba(112,232,244,.12) 36.2% 36.5%, transparent 36.8%),
+        repeating-linear-gradient(0deg, transparent 0 28px, rgba(112,232,244,.07) 29px 30px, transparent 31px 46px);
+      border-left: 1px solid rgba(112,232,244,.34);
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7% 82%, 0 68%, 8% 56%, 0 44%, 8% 32%, 0 22%, 7% 12%);
     }
-    @keyframes entity-fog-drift {
-      0% { background-position: 0% 45%, 100% 55%, 40% 35%, 0 0; filter: brightness(.92); }
-      50% { background-position: 80% 60%, 15% 40%, 65% 55%, 0 0; filter: brightness(1.08); }
-      100% { background-position: 25% 30%, 75% 70%, 30% 45%, 0 0; filter: brightness(.98); }
+
+    /* Raise all scoreboard content above the decorative wings. */
+    body.live-overlay .scoreboard > :not(.board-wings) {
+      position: relative;
+      z-index: 2;
     }
+    body.live-overlay .scoreboard::before {
+      z-index: 3;
+      left: calc(50% - 50vw) !important;
+      right: calc(50% - 50vw) !important;
+      pointer-events: none;
+    }
+
     @media (max-width: 850px) {
-      body.live-overlay .live-shell::before,
-      body.live-overlay .live-shell::after { width: 28px; height: 156px; }
+      body.live-overlay .board-wings::before,
+      body.live-overlay .board-wings::after { width: 30vw; }
     }
     @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .live-shell::before,
-      body.live-overlay .live-shell::after { animation: none !important; }
+      body.live-overlay .scoreboard::before { animation: none !important; }
     }
   </style>
-
 </head>
 
 <body class="live-overlay">
