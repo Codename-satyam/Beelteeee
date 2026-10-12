@@ -87,7 +87,8 @@
     if (final) $('bs-champion-name').textContent = Entity.teamName(state, final.winnerId);
 
     const nm = (m) => `${Entity.teamName(state, m.teamAId)} vs ${Entity.teamName(state, m.teamBId)}`;
-    const live = real.find((m) => m.status === 'in_progress' && m.teamAId && m.teamBId);
+    const am = Entity.activeMatch(state);
+    const live = am && am.status === 'in_progress' && am.teamAId && am.teamBId ? am : null;
     const next = real.filter((m) => m.status === 'pending' && m.teamAId && m.teamBId)
       .sort((a, b) => a.roundIndex - b.roundIndex || a.matchNumber - b.matchNumber)[0];
     $('bs-live').textContent = live ? nm(live) : (final ? 'TOURNAMENT COMPLETE' : 'NO MATCH LIVE');

@@ -159,6 +159,7 @@
         }
       } catch (err) {
         pending = [];
+        serverState = null; serverRev = 0;   // force the re-fetch below to replace the unsaved optimistic state
         showCloudMessage(`Save error: ${err.message || 'database write failed'}`, true);
         fetchRemoteState().catch(() => {});
         throw err;
@@ -218,6 +219,7 @@
 
   function subscribe(callback) {
     const onStorage = (event) => {
+      if (supabaseClient) return; // cloud is the source of truth; another tab's localStorage copy may be older
       if (!event.key || event.key === STORAGE_KEY) {
         cachedState = loadLocal();
         callback(load());
@@ -379,7 +381,7 @@
         const old = parent[slotKey];
         if (old !== (match.winnerId || null)) {
           parent[slotKey] = match.winnerId || null;
-          if (parent.status === 'completed' || parent.scoreA != null || parent.scoreB != null) invalidateMatchAndDescendants(state, parent.id);
+          if (parent.status === 'completed' || parent.scoreA != null || parent.scoreB != null || parent.toss || parent.mapVeto || parent.scorecard) invalidateMatchAndDescendants(state, parent.id);
         }
       }
     });
@@ -441,10 +443,13 @@
   }
 
   function activeMatch(state) {
-    return state.matches.find((match) => match.id === state.activeMatchId) ||
-      state.matches.find((match) => match.status === 'in_progress' && match.teamAId && match.teamBId) ||
-      state.matches.find((match) => match.status === 'pending' && match.teamAId && match.teamBId) ||
-      state.matches.slice().reverse().find((match) => match.status === 'completed') || null;
+    // Single source of truth for "the current match" (used by every screen).
+    // The LIVE match wins, so merely browsing a match or finishing one can't move the overlays.
+    const ok = (m) => m.teamAId && m.teamBId && m.status !== 'bye';
+    return state.matches.find((m) => m.status === 'in_progress' && ok(m)) ||
+      state.matches.find((m) => m.id === state.activeMatchId && ok(m) && m.status !== 'completed') ||
+      state.matches.find((m) => m.status === 'pending' && ok(m)) ||
+      state.matches.slice().reverse().find((m) => m.status === 'completed' && ok(m)) || null;
   }
 
   window.Entity = {

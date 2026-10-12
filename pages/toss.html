@@ -59,9 +59,10 @@
       let timer;
 
       function state() {
-        let r; try { r = JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
+        let r; try { r = window.Entity ? Entity.load() : JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
         if (!r || !Array.isArray(r.matches)) return null;
-        const m = r.matches.find((x) => x.id === r.activeMatchId) || r.matches.find((x) => x.status === 'in_progress') || r.matches.find((x) => x.status === 'pending') || r.matches[0];
+        const q = new URLSearchParams(location.search).get('match');
+        const m = r.matches.find((x) => x.id === q) || (window.Entity && Entity.activeMatch(r)) || r.matches.find((x) => x.id === r.activeMatchId) || r.matches[0];
         if (!m) return null;
         const v = m.mapVeto || {};
         return { id: m.id, teams: r.teams || [],

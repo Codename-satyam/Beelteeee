@@ -270,7 +270,6 @@
 
   $('match-select').addEventListener('change', (event) => {
     selectedId = event.target.value || null;
-    Entity.update((state) => { state.activeMatchId = selectedId; });
     const url = new URL(window.location.href);
     if (selectedId) url.searchParams.set('match', selectedId); else url.searchParams.delete('match');
     window.history.replaceState({}, '', url.pathname + url.search);

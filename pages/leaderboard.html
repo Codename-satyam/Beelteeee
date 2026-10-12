@@ -7,6 +7,8 @@
 <title>Leaderboard — The VNC Trials</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@500;600&display=swap" rel="stylesheet">
+<script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="../shared/shared.js"></script>
 <style>
   :root { --bg:#070709; --line:#2a2a33; --text:#f2f2f4; --dim:#8b8b96; --red:#ff2a3d; --green:#5fe0a0; --gold:#f5c542; --silver:#cfd4dc; --bronze:#d9925a;
           --cols:5.5% 6% minmax(0,1fr) repeat(3,11%) 9% 6.5% 6.5% 10%; }
@@ -258,7 +260,7 @@ function render(st) {
 /* ---------- data wiring ---------- */
 let lastNorm = null;
 function ingest(raw) { try { const n = normalize(raw), k = JSON.stringify(n); if (k === lastNorm) return; lastNorm = k; render(n); } catch (err) { console.error('leaderboard render failed', err); } }
-const readLocal = () => { try { return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } };
+const readLocal = () => { try { if (window.Entity) return Entity.load(); return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } };
 const setConn = (ok, txt) => { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; };
 
 if (params.get('demo')) {                                                                // ?demo=1 plays a fake 8-team tournament
@@ -280,6 +282,7 @@ if (params.get('demo')) {                                                       
 } else {
   const sync = () => { const raw = readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); };
   sync(); window.addEventListener('storage', (e) => { if (e.key === STATE_KEY || e.key === null) sync(); });
+  window.addEventListener('entity-state-change', sync); window.addEventListener('load', sync);
   try { new BroadcastChannel(CHANNEL).onmessage = (e) => { e.data && e.data.teams ? ingest(e.data) : sync(); }; } catch {}
   setInterval(sync, 1000);
 }

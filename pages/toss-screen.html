@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="ban-slash.css">
+<script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="../shared/shared.js"></script>
 <style>
   :root { --bg:#070709; --panel:#121216; --line:#26262d; --text:#f2f2f4; --dim:#8b8b96; --red:#ff2a3d; --gold:#f5c542; }
   * { box-sizing:border-box; margin:0 }
@@ -129,7 +131,7 @@ const CHANNEL   = 'entity-championship-sync-v1';
 function normalize(r) {
   if (!r || !Array.isArray(r.matches)) return null;
   const teams = r.teams || [];
-  const match = r.matches.find(m => m.id === r.activeMatchId) || r.matches.find(m => m.status === 'in_progress') || r.matches.find(m => m.status === 'pending') || r.matches[0];
+  const match = (window.Entity && Entity.activeMatch(r)) || r.matches.find(m => m.id === r.activeMatchId) || r.matches.find(m => m.status === 'in_progress') || r.matches.find(m => m.status === 'pending') || r.matches[0];
   if (!match) return null;
   const toss = match.toss || {}, veto = match.mapVeto || {};
   const teamN = id => teams.find(t => t.id === id)?.name || 'TBD';
@@ -235,7 +237,7 @@ function ingest(raw) {
     lastNorm = k; current = n; render(n);
   } catch (err) { console.error('toss-screen render failed', err); }
 }
-function readLocal() { try { return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } }
+function readLocal() { try { if (window.Entity) return Entity.load(); return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } }
 function setConn(ok, txt) { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; }
 
 const params = new URLSearchParams(location.search);
@@ -261,6 +263,7 @@ if (params.get('demo')) {
   const sync = () => { const raw = readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); };
   sync();
   window.addEventListener('storage', e => { if (e.key === STATE_KEY || e.key === null) sync(); });
+  window.addEventListener('entity-state-change', sync); window.addEventListener('load', sync);
   // the controller's broadcast payload may be a ping, not the state — always re-read the saved state
   try { new BroadcastChannel(CHANNEL).onmessage = e => { const d = e.data; d && d.matches ? ingest(d) : sync(); }; } catch {}
   setInterval(async () => { const raw = (await loadRemote()) || readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }, 1000);
