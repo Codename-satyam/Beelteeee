@@ -1266,6 +1266,103 @@
     }
   </style>
 
+
+  <style id="physical-team-side-swap">
+    /* Physical side switch: the panels exchange grid slots and FLIP animation moves them across. */
+    body.live-overlay .teams-score {
+      position: relative;
+      perspective: 1200px;
+    }
+    body.live-overlay .teams-score > .live-team.a {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    body.live-overlay .teams-score > .live-team.b {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.a {
+      grid-column: 2;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b {
+      grid-column: 1;
+    }
+
+    /* Keep the angular cuts facing the open center gap after the switch. */
+    body.live-overlay .teams-score.sides-swapped > .live-team.a {
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 2.3% 50%);
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b {
+      clip-path: polygon(0 0, 100% 0, 97.7% 50%, 100% 100%, 0 100%);
+    }
+
+    /* Scores always face the center gap, no matter which side a team occupies. */
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
+      left: clamp(20px, 2.4vw, 42px) !important;
+      right: auto !important;
+      text-align: left !important;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
+      left: auto !important;
+      right: clamp(20px, 2.4vw, 42px) !important;
+      text-align: right !important;
+    }
+
+    /* Logos remain on the outer edge after the cards exchange positions. */
+    body.live-overlay .teams-score.sides-swapped > .live-team.a .team-logo {
+      left: auto !important;
+      right: clamp(8px, 1.4vw, 22px) !important;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b .team-logo {
+      left: clamp(8px, 1.4vw, 22px) !important;
+      right: auto !important;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.a.has-logo {
+      padding-left: clamp(16px, 2vw, 30px) !important;
+      padding-right: var(--logo-pad) !important;
+    }
+    body.live-overlay .teams-score.sides-swapped > .live-team.b.has-logo {
+      padding-left: var(--logo-pad) !important;
+      padding-right: clamp(16px, 2vw, 30px) !important;
+    }
+
+    /* The old full-panel stinger would cover the movement, so let viewers see the cards swap. */
+    body.live-overlay .side-swap {
+      display: none !important;
+    }
+
+    @media (max-width: 850px) {
+      body.live-overlay .teams-score.sides-swapped > .live-team.a.has-logo,
+      body.live-overlay .teams-score.sides-swapped > .live-team.b.has-logo {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+      }
+      body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
+        left: 14px !important;
+        right: auto !important;
+      }
+      body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
+        left: auto !important;
+        right: 14px !important;
+      }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
+        left: 7px !important;
+        right: auto !important;
+      }
+      body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
+        left: auto !important;
+        right: 7px !important;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.live-overlay .teams-score > .live-team {
+        scroll-behavior: auto;
+      }
+    }
+  </style>
+
 </head>
 
 <body class="live-overlay">
@@ -1485,6 +1582,7 @@
         const match = selectedMatch(state);
 
         if (!match || !match.teamAId || !match.teamBId) {
+          if (window.resetTeamPanelSides) window.resetTeamPanelSides();
 
           $('team-a-role').textContent = 'AWAITING ROLE';
 
@@ -1501,6 +1599,11 @@
         }
 
 
+
+        // Start each newly selected match with Team A on the left and Team B on the right.
+        if (previous && previous.matchId !== match.id && window.resetTeamPanelSides) {
+          window.resetTeamPanelSides();
+        }
 
         // Game 1: A is Killer. Once Game 1 is confirmed, the scoring menu
 
@@ -1620,20 +1723,99 @@
 
       const $ = (id) => document.getElementById(id);
 
-      let swapTimer;
+      let activeSwapAnimations = [];
+      let sideSwapRun = 0;
+
+      const stopPanelSwapAnimations = () => {
+        sideSwapRun += 1;
+        activeSwapAnimations.forEach((animation) => {
+          try { animation.cancel(); } catch (_) {}
+        });
+        activeSwapAnimations = [];
+        ['team-a-panel', 'team-b-panel'].forEach((id) => {
+          const panel = $(id);
+          if (panel) panel.style.zIndex = '';
+        });
+      };
+
+      window.resetTeamPanelSides = () => {
+        stopPanelSwapAnimations();
+        const grid = document.querySelector('.teams-score');
+        if (grid) grid.classList.remove('sides-swapped');
+      };
+
+      const animatePanelsAcross = () => {
+        const grid = document.querySelector('.teams-score');
+        const a = $('team-a-panel');
+        const b = $('team-b-panel');
+        if (!grid || !a || !b) return;
+
+        // If a second update arrives mid-animation, cleanly finish from the current layout.
+        stopPanelSwapAnimations();
+
+        const beforeA = a.getBoundingClientRect();
+        const beforeB = b.getBoundingClientRect();
+
+        grid.classList.toggle('sides-swapped');
+        void grid.offsetWidth;
+
+        const afterA = a.getBoundingClientRect();
+        const afterB = b.getBoundingClientRect();
+        const dxA = beforeA.left - afterA.left;
+        const dxB = beforeB.left - afterB.left;
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+            !a.animate || !b.animate ||
+            Math.abs(dxA) < 4 || Math.abs(dxB) < 4) {
+          return;
+        }
+
+        const runId = sideSwapRun;
+        a.style.zIndex = '8';
+        b.style.zIndex = '7';
+
+        const makeKeyframes = (dx, yaw) => ([
+          { transform: `translateX(${dx}px) scale(.94) rotateY(${yaw}deg)`, filter: 'brightness(1.04)' },
+          { offset: .42, transform: `translateX(${dx * .48}px) scale(.91) rotateY(${yaw * .65}deg)`, filter: 'brightness(1.34)' },
+          { offset: .76, transform: `translateX(${-dx * .025}px) scale(1.018) rotateY(0deg)`, filter: 'brightness(1.16)' },
+          { transform: 'translateX(0) scale(1) rotateY(0deg)', filter: 'brightness(1)' }
+        ]);
+
+        const options = {
+          duration: 1280,
+          easing: 'cubic-bezier(.22,.85,.25,1)',
+          fill: 'none'
+        };
+
+        const animationA = a.animate(makeKeyframes(dxA, dxA < 0 ? -7 : 7), options);
+        const animationB = b.animate(makeKeyframes(dxB, dxB < 0 ? -7 : 7), options);
+        activeSwapAnimations = [animationA, animationB];
+
+        Promise.all(activeSwapAnimations.map((animation) => animation.finished.catch(() => {})))
+          .then(() => {
+            if (runId !== sideSwapRun) return;
+            a.style.zIndex = '';
+            b.style.zIndex = '';
+            activeSwapAnimations = [];
+          });
+      };
 
       window.sideSwapStinger = (roleA, roleB) => {
-
-        const el = $('side-swap'); if (!el) return;
-
-        $('ss-a-name').textContent = $('team-a-name').textContent; $('ss-b-name').textContent = $('team-b-name').textContent;
-
-        for (const [k, r] of [['a', roleA], ['b', roleB]]) { const s = $('ss-' + k + '-role'); s.textContent = '→ ' + r; s.dataset.role = r.toLowerCase(); }
-
-        el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-
-        clearTimeout(swapTimer); swapTimer = setTimeout(() => el.classList.remove('on'), 2950);
-
+        const el = $('side-swap');
+        if (el) {
+          $('ss-a-name').textContent = $('team-a-name').textContent;
+          $('ss-b-name').textContent = $('team-b-name').textContent;
+          for (const [k, r] of [['a', roleA], ['b', roleB]]) {
+            const s = $('ss-' + k + '-role');
+            if (s) {
+              s.textContent = '→ ' + r;
+              s.dataset.role = r.toLowerCase();
+            }
+          }
+          // The split-panel animation replaces the old center overlay stinger.
+          el.classList.remove('on');
+        }
+        animatePanelsAcross();
       };
 
       // Preview without waiting for real data: add ?preview=swap to the URL, or run previewSideSwap() in the console.
@@ -1644,7 +1826,23 @@
 
         const [a, b] = aKiller ? ['SURVIVOR', 'KILLER'] : ['KILLER', 'SURVIVOR'];
 
-        for (const k of ['a', 'b']) { const p = $('team-' + k + '-panel'); p.classList.remove('swapping'); void p.offsetWidth; p.classList.add('swapping'); setTimeout(() => p.classList.remove('swapping'), 1500); }
+        for (const [k, role] of [['a', a], ['b', b]]) {
+          const panel = $('team-' + k + '-panel');
+          const badge = $('team-' + k + '-role');
+          if (badge) {
+            badge.dataset.role = role.toLowerCase();
+            badge.textContent = role;
+            badge.classList.remove('role-flip');
+            void badge.offsetWidth;
+            badge.classList.add('role-flip');
+          }
+          if (panel) {
+            panel.classList.remove('swapping');
+            void panel.offsetWidth;
+            panel.classList.add('swapping');
+            setTimeout(() => panel.classList.remove('swapping'), 1500);
+          }
+        }
 
         window.sideSwapStinger(a, b);
 
