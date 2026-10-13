@@ -401,7 +401,7 @@
   function setLive(state, matchId) {
     const match = state.matches.find((item) => item.id === matchId);
     if (!match || !match.teamAId || !match.teamBId || match.status === 'bye') return;
-    state.matches.forEach((item) => { if (item.status === 'in_progress') item.status = 'pending'; });
+    state.matches.forEach((item) => { if (item.status === 'in_progress') item.status = item.winnerId ? 'completed' : 'pending'; });
     if (match.status !== 'completed') match.status = 'in_progress';
     state.activeMatchId = matchId;
   }
@@ -415,7 +415,7 @@
     }
     const oldWinner = match.winnerId;
     const hadResult = match.status === 'completed';
-    state.matches.forEach((other) => { if (other.id !== match.id && other.status === 'in_progress') other.status = 'pending'; });
+    state.matches.forEach((other) => { if (other.id !== match.id && other.status === 'in_progress') other.status = other.winnerId ? 'completed' : 'pending'; });
     let winnerId = null;
     if (complete) {
       if (a > b) winnerId = match.teamAId;
