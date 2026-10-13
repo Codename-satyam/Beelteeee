@@ -3504,6 +3504,63 @@
     })();
   </script>
 
+
+  <script id="win-celebration-fallback">
+    /* Safety net: when a match completes and nothing has opened the celebration,
+       open it here. Styling/confetti come from the existing victory controller. */
+    (() => {
+      const el = document.getElementById('win-celebration');
+      const nameEl = document.getElementById('celebration-winner');
+      if (!el || !nameEl) return;
+      const shownFor = new Set();
+      let primed = false, hideTimer;
+
+      const winnerOf = (state, m) => {
+        const id = m.winnerId ?? m.winnerTeamId ?? m.winner?.id ?? (typeof m.winner === 'string' ? m.winner : null);
+        if (id != null && window.Entity && Entity.teamName) {
+          const n = Entity.teamName(state, id);
+          if (n) return n;
+        }
+        return m.winnerName || m.winnerTeam || (typeof m.winner === 'string' ? m.winner : null);
+      };
+      const isDone = (m) => {
+        const st = String(m.status ?? m.state ?? '').toLowerCase();
+        return ['completed', 'complete', 'finished', 'final', 'done'].includes(st) || m.completed === true || m.finished === true;
+      };
+      const show = (name) => {
+        nameEl.textContent = name;
+        el.hidden = false;
+      };
+
+      // Close the scene 10s after it opens, whoever opened it.
+      new MutationObserver(() => {
+        clearTimeout(hideTimer);
+        if (!el.hidden) hideTimer = setTimeout(() => { el.hidden = true; }, 10000);
+      }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
+
+      const check = (state) => {
+        if (!state || !Array.isArray(state.matches)) return;
+        state.matches.forEach((m) => {
+          if (!isDone(m)) return;
+          const name = winnerOf(state, m);
+          if (!name) return;
+          if (!primed) { shownFor.add(m.id); return; }   // don't replay already-finished matches on reload
+          if (shownFor.has(m.id)) return;
+          shownFor.add(m.id);
+          setTimeout(() => { if (el.hidden) show(name); }, 600);
+        });
+        primed = true;
+      };
+
+      window.previewWinCelebration = (name) => show(name || 'TEAM NAME');
+      window.addEventListener('load', () => {
+        if (!window.Entity || !Entity.subscribe) return;
+        Entity.subscribe(check);
+        check(Entity.load());
+      }, { once: true });
+    })();
+  </script>
+
 </body>
 
 </html>
