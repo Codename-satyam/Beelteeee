@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#070709"><title>Bracket Control — The VNC Trials</title>
   <link rel="stylesheet" href="../shared/shared.css"><script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="../shared/shared.js"></script>
-  <script defer src="../shared/scoring-engine.js"></script><script defer src="../shared/bracket-page.js"></script>
+  <script defer src="../shared/scoring-engine.js"></script><script defer src="../shared/recap.js"></script><script defer src="../shared/bracket-page.js"></script>
 </head>
 <body data-controller>
   <main class="shell">
@@ -45,6 +45,13 @@
           <div class="actions" style="margin-top:14px"><button class="button primary" id="open-scoring-btn" type="button">Map vote → Score ↗</button><button class="button" id="set-live-btn" type="button">Set as live</button></div>
           <p class="hint" style="margin:12px 0 0">Use the scoring menu to allocate action-based points. The two-game match swaps Killer and Survivor roles. Survivor points cap at 18 per game and Killer points cap at 19 per game.</p>
           <div id="feedback" class="hint" role="status" aria-live="polite" style="margin-top:12px"></div>
+        </section>
+
+        <section class="panel" id="activity-panel">
+          <h3 class="panel-title">04 / Activity log</h3>
+          <div class="actions"><button class="button" id="undo-btn" type="button" disabled>↶ Undo last change</button><button class="button" id="log-csv-btn" type="button" disabled>Export log CSV</button><button class="button" id="recap-btn" type="button" disabled>Recap card PNG</button></div>
+          <ol class="activity-log" id="activity-log"></ol>
+          <p class="hint" style="margin:10px 0 0">Every scoring change is logged with time and who made it. Undo steps back one change at a time (Ctrl/Cmd+Z inside the scoring menu). The CSV has timestamped moments for VOD editors. The recap PNG works once the selected match is completed.</p>
         </section>
       </div>
 

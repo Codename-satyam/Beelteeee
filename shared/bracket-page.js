@@ -11,6 +11,23 @@
   const openScoringOnLoad = new URLSearchParams(window.location.search).get('openScoring') === '1';
   let scoringOpen = false;
   let scoringGameNo = 1;
+  const overrides = new Set(); // "matchId:gameNo" keys where the admin accepted the amber warnings
+
+  const FIELD_LABELS = { generatorsCompleted: 'Generators', exitEscapes: 'Gate escapes', hatchEscapes: 'Hatch escapes', unhooks: 'Unhooks', kills: 'Kills', hooks: 'Hooks', hatchClosed: 'Hatch closed' };
+  // Plain-English change text for the activity log, plus a "moment" tag editors can search the CSV for.
+  function describeChange(field, oldV, newV) {
+    const show = (v) => (v === null || v === undefined ? '–' : typeof v === 'boolean' ? (v ? 'ON' : 'OFF') : v);
+    const up = Number(newV) > Number(oldV == null ? -1 : oldV);
+    let moment = '';
+    if (field === 'generatorsCompleted' && up) moment = Number(newV) >= 5 ? 'ALL GENERATORS DONE' : `GENERATOR ${newV}`;
+    else if (field === 'hatchClosed' && newV) moment = 'HATCH CLOSED';
+    else if (field === 'hatchEscapes' && up) moment = 'HATCH ESCAPE';
+    else if (field === 'exitEscapes' && up) moment = `ESCAPE ${newV}`;
+    else if (field === 'kills' && up) moment = `KILL ${newV}`;
+    else if (field === 'hooks' && up) moment = `HOOK ${newV}`;
+    else if (field === 'unhooks' && up) moment = `UNHOOK ${newV}`;
+    return { label: `${FIELD_LABELS[field] || field} ${show(oldV)} → ${show(newV)}`, moment };
+  }
 
   function fmt(value) {
     const n = Number(value || 0);
@@ -107,7 +124,38 @@
     ensureSelected(state);
     renderEditor(state);
     renderBracket(state);
+    renderActivity(state);
     if (scoringOpen) renderScoringModal();
+  }
+
+  function setLiveLogged(id) {
+    Entity.update((state) => {
+      Entity.audit.record(state, 'Set as live match', id, { kind: 'live', moment: 'MATCH LIVE' });
+      Entity.setLive(state, id);
+    });
+  }
+
+  function undoLast() {
+    if (!Entity.audit.lastUndoable(currentState())) { showFeedback('Nothing to undo yet.', true); return; }
+    let undone = null;
+    try {
+      Entity.update((draft) => { undone = Entity.audit.undo(draft); });
+      if (undone) showFeedback(`Undid: ${undone.label}`, false);
+      render();
+    } catch (err) { showFeedback(err.message || 'Could not undo.', true); }
+  }
+
+  const clock = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
+  function renderActivity(state) {
+    const list = $('activity-log');
+    if (!list) return;
+    const log = Entity.audit.list(state).slice().reverse();
+    const last = Entity.audit.lastUndoable(state);
+    if ($('undo-btn')) { $('undo-btn').disabled = !last; $('undo-btn').title = last ? `Undo: ${last.label}` : 'Nothing to undo'; }
+    if ($('log-csv-btn')) $('log-csv-btn').disabled = !log.length;
+    const recap = $('recap-btn'), m = getMatch(state, selectedId);
+    if (recap) recap.disabled = !(m && m.status === 'completed' && window.EntityRecap);
+    list.innerHTML = log.length ? log.slice(0, 30).map((e) => `<li class="${e.kind === 'undo' ? 'is-undo' : ''} ${e.undone ? 'is-undone' : ''}"><time>${esc(clock(e.at))}</time><span class="log-main"><b>${e.game ? `G${e.game} · ` : ''}${esc(e.label)}</b><small>${esc(e.matchLabel || '')} · ${esc(String(e.who || '').split('@')[0])}</small></span></li>`).join('') : '<li class="empty-log">No changes recorded yet. Every scoring change shows up here and can be undone.</li>';
   }
 
   function chooseMatch(id) {
@@ -135,6 +183,7 @@
     const match = getMatch(state, selectedId);
     if (!match) { scoringOpen = false; backdrop.hidden = true; return; }
     const card = scoreEngine.normalizeScorecard(match.scorecard);
+    if (scoringGameNo === 2 && !card.game1.confirmed) scoringGameNo = 1; // e.g. after an undo un-confirmed Game 1
     const gameKey = scoringGameNo === 1 ? 'game1' : 'game2';
     const game = card[gameKey];
     const result = scoreEngine.calculateMatch(card, Entity.rolesFor(match, 1).killerId === match.teamAId);
@@ -159,6 +208,11 @@
     const unhookButtons = presetButtons('unhooks', [0,1,2,3,4,5,6,7,8], game.unhooks, ptLabel, 'hooks-preset', game.started);
     const killButtons = presetButtons('kills', [0,1,2,3,4], game.kills, ptLabel, '', game.started);
     const hookButtons = presetButtons('hooks', [0,1,2,3,4,5,6,7,8], game.hooks, ptLabel, 'hooks-preset', game.started);
+    const warnings = scoreEngine.validateGame(game);
+    const warningsG1 = scoreEngine.validateGame(card.game1).length, warningsG2 = scoreEngine.validateGame(card.game2).length;
+    const overridden = overrides.has(`${match.id}:${scoringGameNo}`);
+    const warnHtml = warnings.length ? `<div class="score-warnings" role="alert"><div class="score-warnings-head">⚠ CHECK THESE ENTRIES</div><ul>${warnings.map((w) => `<li>${esc(w.message)}</li>`).join('')}</ul>${game.confirmed ? '<p class="hint" style="margin:6px 0 0">This game was confirmed with these warnings overridden.</p>' : `<label class="override-check"><input type="checkbox" id="score-override" ${overridden ? 'checked' : ''}> These are correct, let me confirm anyway</label>`}</div>` : '';
+    const lastUndo = Entity.audit.lastUndoable(state);
     const killerGenValue = game.generatorsCompleted == null ? 'Choose gens' : `${5-game.generatorsCompleted} remaining · +${5-game.generatorsCompleted} pts`;
 
     $('scoring-modal-content').innerHTML = `
@@ -167,8 +221,8 @@
         <button type="button" class="modal-close" data-score-action="close" aria-label="Close scoring menu">×</button>
       </header>
       <div class="scoring-tabs">
-        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,g1.killerId))} Killer · ${esc(Entity.teamName(state,g1.survivorId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}</span></button>
-        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,g2.killerId))} Killer · ${esc(Entity.teamName(state,g2.survivorId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,g1.killerId))} Killer · ${esc(Entity.teamName(state,g1.survivorId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}${warningsG1?' · ⚠':''}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,g2.killerId))} Killer · ${esc(Entity.teamName(state,g2.survivorId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}${warningsG2?' · ⚠':''}</span></button>
       </div>
       <div class="scoring-rule-strip"><span>SCORING IS ACTION-BASED</span><span>Survivor: max 18</span><span>Killer: max 19</span></div>
       <div class="scoring-role-heading"><span class="role-survivor">SURVIVOR</span><b>${esc(survivorName)}</b><span class="role-killer">KILLER</span><b>${esc(killerName)}</b></div>
@@ -194,10 +248,11 @@
         <div class="summary-column killer-summary"><small>THIS GAME · KILLER</small><strong>${fmt(roundResult.killerScore)}</strong><span>${roundResult.breakdown.generatorsSelected?`${roundResult.breakdown.remainingGenerators} gens left`:'Generators not selected'} · ${roundResult.breakdown.kills} kills · ${roundResult.breakdown.hooks} hooks${roundResult.breakdown.hatchClosed?' · hatch closed +2':''}</span></div>
         <div class="match-total-band"><span>MATCH TOTAL · ${esc(Entity.teamName(state,match.teamAId))}</span><b>${fmt(result.teamA)}</b><span>MATCH TOTAL · ${esc(Entity.teamName(state,match.teamBId))}</span><b>${fmt(result.teamB)}</b></div>
       </section>
+      ${warnHtml}
       ${bothConfirmed && isTied ? `<div class="tie-break-panel"><label for="modal-tie-winner">Match total is tied. Select the tiebreak winner to advance.</label><select id="modal-tie-winner"><option value="">Choose tiebreak winner</option><option value="${match.teamAId}" ${match.tiebreakWinnerId===match.teamAId?'selected':''}>${esc(Entity.teamName(state,match.teamAId))}</option><option value="${match.teamBId}" ${match.tiebreakWinnerId===match.teamBId?'selected':''}>${esc(Entity.teamName(state,match.teamBId))}</option></select></div>` : ''}
       <footer class="scoring-modal-footer">
         <div class="scoring-feedback" id="modal-feedback" role="status" aria-live="polite">${game.confirmed?'This game is confirmed. Changing any action will require confirmation again.':'Choose the generator result, then set any other actions that occurred.'}</div>
-        <div class="actions"><button type="button" class="button ghost" data-score-action="close">Close</button><button type="button" class="button" data-score-action="confirm-game" ${(!roundResult.valid || game.confirmed || (scoringGameNo===2 && !gameOneReady))?'disabled':''}>${game.confirmed?'Game confirmed ✓':`Confirm Game ${scoringGameNo}${scoringGameNo===1?' · Continue to Game 2':''}`}</button><button type="button" class="button primary" data-score-action="complete" ${!canComplete?'disabled':''}>Complete match & advance</button></div>
+        <div class="actions"><button type="button" class="button ghost" data-score-action="undo" ${lastUndo?'':'disabled'} title="${lastUndo?esc('Undo: '+lastUndo.label):'Nothing to undo'}">↶ Undo</button><button type="button" class="button ghost" data-score-action="close">Close</button><button type="button" class="button" data-score-action="confirm-game" ${(!roundResult.valid || game.confirmed || (scoringGameNo===2 && !gameOneReady) || (warnings.length && !overridden))?'disabled':''}>${game.confirmed?'Game confirmed ✓':`Confirm Game ${scoringGameNo}${scoringGameNo===1?' · Continue to Game 2':''}`}</button><button type="button" class="button primary" data-score-action="complete" ${!canComplete?'disabled':''}>Complete match & advance</button></div>
       </footer>`;
     backdrop.hidden = false;
   }
@@ -251,10 +306,12 @@
     $('scoring-modal').hidden = true;
   }
 
-  function updateScoring(mutator, editedGameNo, invalidateOtherGame = true) {
+  function updateScoring(mutator, editedGameNo, invalidateOtherGame = true, audit = null) {
+    if (audit && audit.clearOverride) overrides.delete(`${selectedId}:${editedGameNo}`);
     Entity.update((state) => {
       const match = getMatch(state, selectedId);
       if (!match) throw new Error('Select a playable match first.');
+      if (audit) Entity.audit.record(state, audit.label, match.id, { game: editedGameNo, kind: audit.kind || 'score', moment: audit.moment || '' });
       match.scorecard = scoreEngine.normalizeScorecard(match.scorecard);
       mutator(match.scorecard, match);
       if (invalidateOtherGame && editedGameNo === 1) match.scorecard.game2.confirmed = false;
@@ -272,6 +329,7 @@
     const existingCard = scoreEngine.normalizeScorecard(existingMatch && existingMatch.scorecard);
     const existingGame = existingCard[scoringGameNo === 1 ? 'game1' : 'game2'];
     if (existingGame.started && existingGame[field] === val) return;
+    const change = describeChange(field, existingGame[field], field === 'hatchClosed' ? Boolean(val) : val);
     updateScoring((card) => {
       const game = card[scoringGameNo === 1 ? 'game1' : 'game2'];
       const nextValue = field === 'hatchClosed' ? Boolean(val) : val;
@@ -279,16 +337,19 @@
       game[field] = nextValue;
       game.started = true;
       game.confirmed = false;
-    }, scoringGameNo);
+    }, scoringGameNo, true, { ...change, clearOverride: true });
   }
 
   function toggleScoreField(field) {
+    const existingMatch = getMatch(currentState(), selectedId);
+    const existingGame = scoreEngine.normalizeScorecard(existingMatch && existingMatch.scorecard)[scoringGameNo === 1 ? 'game1' : 'game2'];
+    const change = describeChange(field, Boolean(existingGame[field]), !existingGame[field]);
     updateScoring((card) => {
       const game = card[scoringGameNo === 1 ? 'game1' : 'game2'];
       game[field] = !game[field];
       game.started = true;
       game.confirmed = false;
-    }, scoringGameNo);
+    }, scoringGameNo, true, { ...change, clearOverride: true });
   }
 
   function confirmGame() {
@@ -307,9 +368,14 @@
       $('modal-feedback').classList.add('bad');
       return;
     }
+    const warnings = scoreEngine.validateGame(game);
+    if (warnings.length && !overrides.has(`${selectedId}:${scoringGameNo}`)) {
+      $('modal-feedback').textContent = 'Some entries look wrong (see the amber box). Fix them, or tick the override to confirm anyway.';
+      return;
+    }
     game.started = true;
     game.confirmed = true;
-    updateScoring((draft) => { draft[gameKey] = game; }, scoringGameNo, false);
+    updateScoring((draft) => { draft[gameKey] = game; }, scoringGameNo, false, { label: `Confirmed${warnings.length ? ' (warnings overridden)' : ''}`, kind: 'confirm', moment: `GAME ${scoringGameNo} CONFIRMED` });
     showFeedback(`Game ${scoringGameNo} confirmed.`, false);
     if (scoringGameNo === 1) {
       scoringGameNo = 2;
@@ -340,6 +406,7 @@
       Entity.update((draft) => {
         const current = getMatch(draft, selectedId);
         const freshResult = getScoreResult(current);
+        Entity.audit.record(draft, `Match completed ${freshResult.teamA}–${freshResult.teamB}`, current.id, { kind: 'complete', moment: 'MATCH COMPLETE', withAncestors: true });
         Entity.savePoints(draft, current.id, freshResult.teamA, freshResult.teamB, true, current.tiebreakWinnerId || null);
       });
       closeScoringMenu();
@@ -420,14 +487,29 @@
   $('reset-btn').addEventListener('click', () => {
     if (!window.confirm('Delete all teams, matches, scores and toss data for this browser?')) return;
     const state = JSON.parse(JSON.stringify(currentState()));
-    state.teams = []; state.matches = []; state.activeMatchId = null; state.generated = false;
+    state.teams = []; state.matches = []; state.activeMatchId = null; state.generated = false; state.auditLog = [];
     Entity.save(state); selectedId = null; closeScoringMenu(); showFeedback('Tournament data reset.', false); render();
+  });
+
+  if ($('undo-btn')) $('undo-btn').addEventListener('click', undoLast);
+  if ($('log-csv-btn')) $('log-csv-btn').addEventListener('click', () => {
+    const blob = new Blob(['\ufeff' + Entity.audit.toCsv(currentState())], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = 'vnc-trials-activity-log.csv';
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    showFeedback('Activity log exported as CSV.', false);
+  });
+  if ($('recap-btn')) $('recap-btn').addEventListener('click', () => {
+    const state = currentState(), match = getMatch(state, selectedId);
+    if (!match || match.status !== 'completed' || !window.EntityRecap) return;
+    window.EntityRecap.download(state, match);
+    showFeedback('Recap card downloaded as PNG.', false);
   });
 
   $('match-select').addEventListener('change', (event) => chooseMatch(event.target.value));
   $('open-scoring-btn').addEventListener('click', () => startMatchWorkflow(selectedId));
   $('set-live-btn').addEventListener('click', () => {
-    try { Entity.update((state) => Entity.setLive(state, selectedId)); showFeedback('Selected match is now the live match.', false); render(); }
+    try { setLiveLogged(selectedId); showFeedback('Selected match is now the live match.', false); render(); }
     catch (err) { showFeedback(err.message, true); }
   });
 
@@ -438,7 +520,7 @@
     if (button.dataset.action === 'start') startMatchWorkflow(id);
     if (button.dataset.action === 'live') {
       selectedId = id;
-      try { Entity.update((state) => Entity.setLive(state, id)); showFeedback('Match set as live.', false); render(); }
+      try { setLiveLogged(id); showFeedback('Match set as live.', false); render(); }
       catch (err) { showFeedback(err.message, true); }
     }
   });
@@ -459,18 +541,26 @@
     if (action === 'toggle') toggleScoreField(button.dataset.field);
     if (action === 'confirm-game') confirmGame();
     if (action === 'complete') completeMatch();
+    if (action === 'undo') undoLast();
   });
 
   $('scoring-modal').addEventListener('change', (event) => {
+    if (event.target.id === 'score-override') {
+      const key = `${selectedId}:${scoringGameNo}`;
+      if (event.target.checked) overrides.add(key); else overrides.delete(key);
+      renderScoringModal();
+      return;
+    }
     if (event.target.id === 'modal-tie-winner') {
       const value = event.target.value;
-      Entity.update((state) => { const match = getMatch(state, selectedId); if (match) match.tiebreakWinnerId = value || null; });
+      Entity.update((state) => { const match = getMatch(state, selectedId); if (match) { Entity.audit.record(state, `Tiebreak winner → ${value ? Entity.teamName(state, value) : 'none'}`, match.id, { kind: 'tiebreak' }); match.tiebreakWinnerId = value || null; } });
       render();
     }
   });
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && scoringOpen) closeScoringMenu();
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z' && scoringOpen && !/^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) { event.preventDefault(); undoLast(); }
   });
 
   Entity.subscribe(render);

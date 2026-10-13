@@ -30,3 +30,21 @@
 
 
 
+
+
+/* ===== Scoring sanity warnings, activity log, recap (added) ===== */
+.score-warnings{margin:14px 0 0;padding:12px 16px;border:1px solid #b8862b;border-left:4px solid #f4c95d;background:rgba(244,201,93,.09);color:#f1dfae}
+.score-warnings-head{font:800 .68rem var(--mono,monospace);letter-spacing:.18em;color:#f4c95d;margin-bottom:6px}
+.score-warnings ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:.88rem;line-height:1.4}
+.override-check{display:flex;align-items:center;gap:10px;margin-top:10px;font:700 .78rem var(--mono,monospace);letter-spacing:.04em;color:#fff;cursor:pointer}
+.override-check input{width:18px;height:18px;accent-color:#f4c95d}
+.score-tab span{white-space:normal}
+.activity-log{list-style:none;margin:14px 0 0;padding:0;max-height:340px;overflow:auto;display:grid;gap:1px;border:1px solid #23232b;background:#23232b}
+.activity-log li{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;padding:8px 12px;background:#0b0b0f}
+.activity-log time{font:700 .62rem var(--mono,monospace);letter-spacing:.08em;color:var(--muted,#8b8b99);white-space:nowrap}
+.activity-log .log-main{display:grid;gap:2px;min-width:0}
+.activity-log .log-main b{font:700 .85rem/1.25 var(--body,inherit);color:#fff;overflow-wrap:anywhere}
+.activity-log .log-main small{font:600 .58rem var(--mono,monospace);letter-spacing:.06em;color:var(--muted,#8b8b99)}
+.activity-log li.is-undone .log-main b{color:#6d6d7a;text-decoration:line-through}
+.activity-log li.is-undo .log-main b{color:#f4c95d}
+.activity-log li.empty-log{display:block;color:var(--muted,#8b8b99);font-size:.82rem}

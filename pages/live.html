@@ -20,1527 +20,290 @@
 
   <script defer src="../shared/scoring-engine.js"></script>
 
-  <script defer src="../shared/live-page.js"></script>
-
-  <style>
-
-    /* Live overlay-only adjustments. Keep shared project files untouched. */
-
-    html.overlay-mode, html.overlay-mode body, body.live-overlay {
-
-      background: transparent !important;
-
-      background-color: transparent !important;
-
-    }
-
-    body.live-overlay .live-shell {
-
-      width: min(1260px, calc(100% - 80px));
-
-      grid-template-rows: auto minmax(0, 1fr);
-
-      gap: clamp(8px, 1.4vh, 16px);
-
-      padding: clamp(14px, 2.5vh, 26px) 0;
-
-    }
-
-    body.live-overlay .scoreboard {
-
-      align-self: center;
-
-      justify-self: center;
-
-      width: 100%;
-
-    }
-
-    body.live-overlay .teams-score {
-
-      align-items: stretch;
-
-    }
-
-    body.live-overlay .live-team {
-
-      position: relative;
-
-      display: flex;
-
-      flex-direction: column;
-
-      align-items: center;
-
-      justify-content: flex-start;
-
-      /* Use a definite panel height so the score can anchor to its bottom. */
-
-      height: clamp(220px, 25vh, 270px);
-
-      min-height: 0;
-
-      padding: clamp(16px, 2.2vh, 24px) clamp(12px, 1.8vw, 24px) 86px;
-
-      transition: background .42s ease, filter .42s ease;
-
-    }
-
-    body.live-overlay .live-team[data-role="killer"] {
-
-      background: linear-gradient(180deg, rgba(225,29,46,.075), transparent 74%);
-
-    }
-
-    body.live-overlay .live-team[data-role="survivor"] {
-
-      background: linear-gradient(180deg, rgba(112,232,244,.07), transparent 74%);
-
-    }
-
-    body.live-overlay .live-team .team-name {
-
-      margin: clamp(7px, 1.1vh, 12px) 0 8px;
-
-      font-size: clamp(1.4rem, 3vw, 3.35rem);
-
-    }
-
-    .team-role {
-
-      align-self: center;
-
-      display: inline-flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      min-height: 22px;
-
-      margin: 2px 0 7px;
-
-      padding: 4px 9px;
-
-      border: 1px solid rgba(255,255,255,.17);
-
-      background: rgba(0,0,0,.32);
-
-      color: #d1d1d9;
-
-      font: 800 clamp(.48rem, .58vw, .62rem)/1 var(--mono);
-
-      letter-spacing: .13em;
-
-      white-space: nowrap;
-
-      transform-style: preserve-3d;
-
-      backface-visibility: hidden;
-
-    }
-
-    .team-role[data-role="killer"] {
-
-      border-color: rgba(255,100,117,.58);
-
-      color: #ff7581;
-
-      box-shadow: 0 0 15px rgba(255,70,85,.08);
-
-    }
-
-    .team-role[data-role="survivor"] {
-
-      border-color: rgba(112,232,244,.52);
-
-      color: #70e8f4;
-
-      box-shadow: 0 0 15px rgba(112,232,244,.08);
-
-    }
-
-    .team-role.role-flip { animation: role-swap-in .62s cubic-bezier(.2,.85,.25,1) both; }
-
-    .live-team.role-changing { animation: role-panel-pulse .62s ease both; }
-
-    @keyframes role-swap-in {
-
-      0% { opacity: .15; transform: perspective(500px) rotateX(-88deg) translateY(7px) scale(.9); filter: blur(4px); }
-
-      58% { opacity: 1; transform: perspective(500px) rotateX(12deg) translateY(-2px) scale(1.05); filter: blur(0); }
-
-      100% { opacity: 1; transform: perspective(500px) rotateX(0) translateY(0) scale(1); }
-
-    }
-
-    @keyframes role-panel-pulse {
-
-      0% { filter: brightness(.8); }
-
-      45% { filter: brightness(1.3); }
-
-      100% { filter: brightness(1); }
-
-    }
-
-    /* Put the score value at the foot of each team panel. */
-
-    body.live-overlay .live-team .team-status {
-
-      margin-top: 0;
-
-      font-size: clamp(.44rem, .54vw, .56rem);
-
-    }
-
-    body.live-overlay .live-team .score {
-
-      /* Absolute anchoring prevents flex/grid content from pulling it back to center. */
-
-      position: absolute;
-
-      left: 0;
-
-      right: 0;
-
-      bottom: clamp(13px, 1.8vh, 20px);
-
-      margin: 0 !important;
-
-      padding: 0 !important;
-
-      text-align: center;
-
-      font-size: clamp(3rem, 7vh, 5.5rem);
-
-      line-height: .82;
-
-    }
-
-    /* This compact overlay intentionally removes the large points-schema strip. */
-
-    .points-schema { display: none !important; }
-
-    .score-popups, .point-popups { z-index: 30; }
-
-    @media (max-width: 850px) {
-
-      body.live-overlay .live-shell { width: calc(100% - 28px); padding: 12px 0; gap: 8px; }
-
-      body.live-overlay .live-team { height: 220px; min-height: 0; padding: 16px 8px 76px; }
-
-      body.live-overlay .live-team .score { font-size: clamp(2.7rem, 8vh, 4.4rem); }
-
-      body.live-overlay .toss-banner-advantage { display: none; }
-
-    }
-
-    @media (max-width: 520px) {
-
-      body.live-overlay .live-shell { width: calc(100% - 14px); }
-
-      body.live-overlay .live-team { height: 190px; min-height: 0; padding: 13px 4px 68px; }
-
-      body.live-overlay .live-team .score { font-size: clamp(2.3rem, 10vw, 3.5rem); }
-
-      .team-role { font-size: .42rem; letter-spacing: .06em; padding: 4px 5px; }
-
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-
-      .team-role.role-flip, .live-team.role-changing { animation: none !important; }
-
-    }
-
-  </style>
-
-
-
-  <style id="bottom-docked-overlay-fix">
-
-    /* Keep the toss banner compact at the top while docking the ENTIRE scoreboard panel at the bottom. */
-
-    html.overlay-mode,
-
-    html.overlay-mode body,
-
-    body.live-overlay {
-
-      width: 100%;
-
-      height: 100%;
-
-      min-height: 100%;
-
-      overflow: hidden !important;
-
-    }
-
-
-
-    body.live-overlay .live-shell {
-
-      position: fixed !important;
-
-      inset: 0 !important;
-
-      width: min(1440px, calc(100% - 68px)) !important;
-
-      height: 100vh !important;
-
-      height: 100dvh !important;
-
-      min-height: 0 !important;
-
-      margin: 0 auto !important;
-
-      padding: 0 !important;
-
-      display: block !important;
-
-      isolation: isolate;
-
-      overflow: visible;
-
-    }
-
-
-
-    body.live-overlay .toss-banner {
-
-      position: absolute !important;
-
-      top: clamp(14px, 2.6vh, 30px) !important;
-
-      left: 50% !important;
-
-      right: auto !important;
-
-      bottom: auto !important;
-
-      transform: translateX(-50%);
-
-      z-index: 10;
-
-      max-width: min(92%, 680px);
-
-      margin: 0;
-
-    }
-
-
-
-    body.live-overlay .scoreboard {
-
-      position: absolute !important;
-
-      top: auto !important;
-
-      left: 0 !important;
-
-      right: 0 !important;
-
-      bottom: clamp(18px, 3.5vh, 38px) !important;
-
-      width: 100% !important;
-
-      margin: 0 !important;
-
-      transform: none !important;
-
-      z-index: 5;
-
-    }
-
-
-
-    /* Point-award popups stay aligned to the vertical center of the full panel. */
-
-    body.live-overlay .point-popups {
-
-      top: 50%;
-
-      bottom: auto;
-
-      z-index: 20;
-
-    }
-
-
-
-    @media (max-width: 850px) {
-
-      body.live-overlay .live-shell {
-
-        width: calc(100% - 24px) !important;
-
-      }
-
-      body.live-overlay .toss-banner {
-
-        max-width: 98%;
-
-      }
-
-    }
-
-
-
-    @media (max-width: 520px) {
-
-      body.live-overlay .live-shell {
-
-        width: calc(100% - 14px) !important;
-
-      }
-
-      body.live-overlay .scoreboard {
-
-        bottom: 12px !important;
-
-      }
-
-      body.live-overlay .toss-banner {
-
-        top: 10px !important;
-
-      }
-
-    }
-
-  </style>
-
-
-
-
-
-  <style id="live-missing-styles">
-
-    /* Styles for elements live.html uses that shared.css does not define. */
-
-    .toss-banner{display:flex;align-items:center;gap:10px;padding:8px 18px;border:1px solid rgba(244,201,93,.5);background:rgba(8,8,11,.86);color:#fff;font:700 .62rem var(--mono);letter-spacing:.12em;white-space:nowrap}
-
-    .toss-banner strong{font:900 1.15rem var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
-
-    .toss-banner-mark{color:var(--red2)}.toss-banner-label{color:#aaaab8}.toss-banner-advantage{color:#d6d6de}
-
-    body.live-overlay .scoreboard{background:rgba(8,8,11,.9);border:1px solid #303039;backdrop-filter:blur(4px)}
-
-    .point-popups{position:absolute;top:50%;width:34%;height:0;display:flex;flex-direction:column;align-items:center;pointer-events:none}
-
-    .point-popups-a{left:0}.point-popups-b{right:0}
-
-    .point-popup{position:absolute;font:900 clamp(2.4rem,6vh,4.6rem)/1 var(--display);color:var(--green);text-shadow:0 0 22px rgba(95,224,160,.6);animation:point-pop 2.4s ease-out forwards}
-
-    @keyframes point-pop{0%{opacity:0;transform:translateY(24px) scale(.6)}15%{opacity:1;transform:translateY(0) scale(1.15)}70%{opacity:1}100%{opacity:0;transform:translateY(-80px) scale(1)}}
-
-    .win-celebration{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(225,29,46,.28),rgba(0,0,0,.78));animation:win-in .5s ease both}
-
-    .win-celebration[hidden]{display:none}
-
-    @keyframes win-in{from{opacity:0}to{opacity:1}}
-
-    .win-card{text-align:center;padding:34px 70px;border:1px solid var(--red);background:rgba(8,8,11,.92)}
-
-    .win-kicker{font:700 .6rem var(--mono);letter-spacing:.2em;color:var(--red2)}
-
-    .win-title{margin-top:12px;font:900 clamp(1.4rem,3vw,2.4rem) var(--display);letter-spacing:.2em;color:#c6c6d0}
-
-    .win-name{margin:8px 0;font:900 clamp(2.6rem,8vw,6.5rem)/.9 var(--display);text-transform:uppercase;color:#fff;overflow-wrap:anywhere}
-
-    .win-subtitle{font:700 .66rem var(--mono);letter-spacing:.2em;color:var(--gold)}
-
-    .win-particles i{position:absolute;top:-10px;width:6px;height:14px;background:var(--gold);opacity:.9;animation:win-fall linear infinite}
-
-    .win-particles i:nth-child(3n){background:var(--red2)}.win-particles i:nth-child(3n+1){background:#fff}
-
-    @keyframes win-fall{to{transform:translateY(110vh) rotate(540deg)}}
-
-  </style>
-
-  <style id="live-polish">
-
-    /* ===== Shorter bottom panel ===== */
-
-    body.live-overlay .live-team{--c:120,120,132;height:clamp(160px,18.5vh,200px);padding:clamp(10px,1.5vh,16px) clamp(12px,1.8vw,24px) 60px;
-
-      box-shadow:inset 0 3px 0 rgba(var(--c),.85);transition:box-shadow .5s ease,background .42s ease,filter .42s ease}
-
-    body.live-overlay .live-team[data-role="killer"]{--c:255,70,85}
-
-    body.live-overlay .live-team[data-role="survivor"]{--c:112,232,244}
-
-    body.live-overlay .live-team .team-name{font-size:clamp(1.3rem,2.7vw,3rem);margin:clamp(4px,.7vh,8px) 0 5px}
-
-    body.live-overlay .live-team .score{font-size:clamp(2.4rem,5.4vh,4.2rem);bottom:clamp(8px,1.3vh,14px);font-variant-numeric:tabular-nums}
-
-    @media (max-width:850px){body.live-overlay .live-team{height:156px;padding-bottom:54px}}
-
-    @media (max-width:520px){body.live-overlay .live-team{height:136px;padding-bottom:48px}}
-
-
-
-    /* ===== Look ===== */
-
-    body.live-overlay .scoreboard{background:linear-gradient(180deg,rgba(18,18,25,.94),rgba(6,6,9,.95));border-color:#2b2b35;
-
-      box-shadow:0 22px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);animation:lp-board-in .9s cubic-bezier(.2,.85,.25,1) both}
-
-    body.live-overlay .scoreboard::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;z-index:3;pointer-events:none;
-
-      background:linear-gradient(90deg,transparent,#e11d2e 18%,#fff 50%,#e11d2e 82%,transparent);background-size:220% 100%;animation:lp-sheen 6s linear infinite}
-
-    body.live-overlay .toss-banner{animation:lp-banner-in .8s .35s cubic-bezier(.2,.85,.25,1) both}
-
-    body.live-overlay .versus .vs{text-shadow:0 0 20px rgba(255,70,85,.65);animation:lp-vs 3.2s ease-in-out infinite}
-
-    body.live-overlay .live-team .score{transition:text-shadow .5s ease}
-
-    body.live-overlay .live-team.leading[data-role="killer"] .score{text-shadow:0 0 28px rgba(255,70,85,.65)}
-
-    body.live-overlay .live-team.leading[data-role="survivor"] .score{text-shadow:0 0 28px rgba(112,232,244,.6)}
-
-    @keyframes lp-board-in{from{opacity:0;translate:0 46px}to{opacity:1;translate:0 0}}
-
-    @keyframes lp-banner-in{from{opacity:0;translate:0 -30px}to{opacity:1;translate:0 0}}
-
-    @keyframes lp-sheen{from{background-position:220% 0}to{background-position:-220% 0}}
-
-    @keyframes lp-vs{50%{text-shadow:0 0 34px rgba(255,70,85,.95)}}
-
-
-
-    /* ===== Live-data animations (triggered by JS when text changes) ===== */
-
-    .lp-tick{animation:lp-tick .55s cubic-bezier(.2,1.3,.4,1)}
-
-    .lp-bump{animation:lp-bump .75s cubic-bezier(.2,1.4,.4,1)}
-
-    @keyframes lp-tick{0%{opacity:.15;scale:.84;filter:blur(3px)}60%{scale:1.07;filter:blur(0)}100%{opacity:1;scale:1}}
-
-    @keyframes lp-bump{0%{scale:1}30%{scale:1.3;color:#5fe0a0;text-shadow:0 0 34px rgba(95,224,160,.85)}100%{scale:1}}
-
-    body.live-overlay .live-team::after{content:"";position:absolute;inset:0;opacity:0;pointer-events:none;z-index:2}
-
-    body.live-overlay .live-team.scored::after{background:radial-gradient(ellipse at 50% 100%,rgba(95,224,160,.4),transparent 70%);animation:lp-flash .9s ease-out}
-
-    body.live-overlay .live-team.swapping::after{background:linear-gradient(100deg,transparent 30%,rgba(var(--c),.5) 50%,transparent 70%);animation:lp-sweep 1.1s .25s ease-in-out}
-
-    @keyframes lp-flash{0%{opacity:1}100%{opacity:0}}
-
-    @keyframes lp-sweep{0%{opacity:1;transform:translateX(-100%)}99%{opacity:1}100%{opacity:0;transform:translateX(100%)}}
-
-
-
-    /* ===== Side-swap stinger (plays when Killer / Survivor roles change) ===== */
-
-    .side-swap{position:absolute;inset:0;z-index:12;display:none;grid-template-columns:1fr auto 1fr;align-items:center;gap:2vw;padding:0 3vw;
-
-      background:linear-gradient(90deg,rgba(6,6,9,.97),rgba(16,16,22,.98) 50%,rgba(6,6,9,.97));border-top:2px solid var(--gold);pointer-events:none}
-
-    .side-swap.on{display:grid;animation:lp-ss-life 2.9s ease both}
-
-    .ss-lane{display:flex;flex-direction:column;gap:6px;min-width:0}
-
-    .ss-lane b{font:900 clamp(1.1rem,2.4vw,2.4rem)/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-    .ss-lane span{font:800 clamp(.6rem,.9vw,.9rem) var(--mono);letter-spacing:.2em}
-
-    .ss-lane span[data-role="killer"]{color:#ff7581}.ss-lane span[data-role="survivor"]{color:#70e8f4}
-
-    .ss-a{align-items:flex-start;animation:lp-ss-a .7s .2s cubic-bezier(.2,.9,.2,1) both}
-
-    .ss-b{align-items:flex-end;text-align:right;animation:lp-ss-b .7s .2s cubic-bezier(.2,.9,.2,1) both}
-
-    .ss-mid{display:flex;flex-direction:column;align-items:center;gap:4px}
-
-    .ss-mid i{font:900 clamp(1.8rem,4vw,3.4rem)/1 var(--display);font-style:normal;color:var(--gold);animation:lp-ss-spin 1.1s .1s cubic-bezier(.3,1.3,.4,1) both}
-
-    .ss-mid em{font:800 clamp(.6rem,.95vw,.95rem) var(--mono);font-style:normal;letter-spacing:.34em;color:#d6d6de;animation:lp-ss-track 1.4s .1s ease-out both}
-
-    @keyframes lp-ss-life{0%{clip-path:inset(0 50% 0 50%)}14%,86%{clip-path:inset(0)}100%{clip-path:inset(0 50% 0 50%)}}
-
-    @keyframes lp-ss-a{from{opacity:0;translate:-60px 0}to{opacity:1;translate:0 0}}
-
-    @keyframes lp-ss-b{from{opacity:0;translate:60px 0}to{opacity:1;translate:0 0}}
-
-    @keyframes lp-ss-spin{from{rotate:-180deg;scale:.4;opacity:0}to{rotate:0deg;scale:1;opacity:1}}
-
-    @keyframes lp-ss-track{from{letter-spacing:.8em;opacity:0}to{letter-spacing:.34em;opacity:1}}
-
-
-
-    /* ===== Win card ===== */
-
-    .win-card{animation:lp-win-card .9s cubic-bezier(.2,1.2,.3,1) both;box-shadow:0 0 70px rgba(225,29,46,.35)}
-
-    .win-name{text-shadow:0 0 40px rgba(255,255,255,.3)}
-
-    .win-celebration::before{content:"";position:absolute;left:50%;top:50%;width:30vmin;height:30vmin;margin:-15vmin 0 0 -15vmin;border-radius:50%;border:3px solid var(--gold);animation:lp-shock 1.4s ease-out both}
-
-    @keyframes lp-win-card{from{opacity:0;scale:.7;filter:blur(8px)}to{opacity:1;scale:1;filter:blur(0)}}
-
-    @keyframes lp-shock{from{scale:.2;opacity:.9}to{scale:4.5;opacity:0}}
-
-
-
-    @media (prefers-reduced-motion:reduce){.lp-tick,.lp-bump,.side-swap.on,.win-card,.win-celebration::before,body.live-overlay .scoreboard,body.live-overlay .toss-banner,body.live-overlay .scoreboard::before,body.live-overlay .versus .vs,.ss-a,.ss-b,.ss-mid i,.ss-mid em,.live-team.scored::after,.live-team.swapping::after{animation:none!important}}
-
-  </style>
-
-  <style id="live-logos">
-
-    /* ===== Team logos (outer edge of each panel) ===== */
-
-    :root{--logo:clamp(104px,9.5vw,150px);--logo-pad:calc(var(--logo) + clamp(16px,2.2vw,32px))}
-
-    body.live-overlay .live-team .team-logo{position:absolute;top:calc(50% - 8px);translate:0 -50%;width:var(--logo);height:var(--logo);z-index:3;pointer-events:none;display:none}
-
-    body.live-overlay .live-team.a .team-logo{left:clamp(8px,1.4vw,22px)}
-
-    body.live-overlay .live-team.b .team-logo{right:clamp(8px,1.4vw,22px)}
-
-    body.live-overlay .live-team.has-logo .team-logo{display:block}
-
-    .team-logo::before{content:"";position:absolute;inset:-8%;z-index:-1;background:radial-gradient(circle,rgba(var(--acc-rgb,120,120,132),.3),transparent 66%)}
-
-    .team-logo img{width:100%;height:100%;object-fit:contain;scale:1.18;filter:drop-shadow(0 8px 18px rgba(var(--acc-rgb,0,0,0),.4))}
-
-    /* text block + score shift away from the logo so nothing overlaps */
-
-    body.live-overlay .live-team.a.has-logo{padding-left:var(--logo-pad)}
-
-    body.live-overlay .live-team.b.has-logo{padding-right:var(--logo-pad)}
-
-    body.live-overlay .live-team.a.has-logo .score{left:var(--logo-pad)}
-
-    body.live-overlay .live-team.b.has-logo .score{right:var(--logo-pad)}
-
-    body.live-overlay .live-team.has-logo{box-shadow:inset 0 3px 0 rgba(var(--c),.85),inset 0 -3px 0 rgba(var(--acc-rgb),.9)}  /* top = role colour, bottom = team colour */
-
-    body.live-overlay .live-team.has-logo .team-name{text-shadow:0 0 26px rgba(var(--acc-rgb),.4)}
-
-    .team-logo.logo-in{animation:lp-logo-in .8s cubic-bezier(.2,1.1,.3,1) both}
-
-    @keyframes lp-logo-in{from{opacity:0;scale:.55;rotate:-10deg}to{opacity:1;scale:1;rotate:0deg}}
-
-
-
-    /* ===== Logos in the toss banner, side-swap stinger and win card ===== */
-
-    .mini-logo{width:30px;height:30px;object-fit:contain;scale:1.25}
-
-    .ss-logo{width:clamp(54px,7vw,92px);height:clamp(54px,7vw,92px);object-fit:contain;scale:1.15;filter:drop-shadow(0 6px 14px rgba(0,0,0,.6))}
-
-    .win-logo{display:block;width:clamp(90px,16vh,150px);height:clamp(90px,16vh,150px);object-fit:contain;margin:0 auto 4px;scale:1.15;filter:drop-shadow(0 0 26px rgba(var(--acc-rgb,255,70,85),.55))}
-
-    .mini-logo[hidden],.ss-logo[hidden],.win-logo[hidden]{display:none}
-
-
-
-    @media (max-width:850px){body.live-overlay .live-team .team-logo{display:none !important}
-
-      body.live-overlay .live-team.a.has-logo{padding-left:8px}body.live-overlay .live-team.b.has-logo{padding-right:8px}
-
-      body.live-overlay .live-team.a.has-logo .score{left:0}body.live-overlay .live-team.b.has-logo .score{right:0}}
-
-    @media (prefers-reduced-motion:reduce){.team-logo.logo-in{animation:none!important}}
-
-  </style>
-
-  <style id="live-full-width">
-
-    /* Scoreboard stretches edge to edge. The wings sit behind the board and reach both screen edges;
-
-       the team panels, scores and everything inside keep their original centred position. */
-
-    html, body.live-overlay { overflow-x: hidden !important; }   /* the wings never create a horizontal scrollbar */
-
-    :root { --board-gap: 0px; }              /* gap between the bottom of the screen and the board — raise it (e.g. 24px) if you want it to float */
-
-    body.live-overlay .scoreboard {
-
-      bottom: var(--board-gap) !important;
-
-      background: linear-gradient(180deg, #14141b, #07070a) !important;      /* fully solid so it matches the wings */
-
-      backdrop-filter: none !important;
-
-      border-left: 0 !important; border-right: 0 !important;
-
-      border-bottom: 0 !important;
-
-    }
-
-    .board-wings {
-
-      position: absolute; z-index: -1; top: 0; bottom: 0;
-
-      left: calc(50% - 50vw); right: calc(50% - 50vw);
-
-      background: linear-gradient(180deg, #14141b, #07070a);
-
-      border-top: 1px solid #2b2b35;
-
-      box-shadow: 0 -18px 50px rgba(0,0,0,.5);
-
-      pointer-events: none;
-
-    }
-
-    body.live-overlay .scoreboard::before { left: calc(50% - 50vw) !important; right: calc(50% - 50vw) !important; }   /* light sheen runs the full width */
-
-  </style>
-
-
-  <style id="cyberpunk-extended-wings">
-    /* OPTION 1: angular cyberpunk wings extending the scoreboard to both viewport edges. */
-    body.live-overlay .scoreboard {
-      position: absolute !important;
-      isolation: isolate;
-      overflow: visible !important;
-      background: linear-gradient(180deg, #14141b 0%, #08080d 58%, #050507 100%) !important;
-    }
-
-    body.live-overlay .board-wings {
-      position: absolute !important;
-      z-index: 0 !important;
-      top: 0;
-      bottom: 0;
-      left: calc(50% - 50vw) !important;
-      right: calc(50% - 50vw) !important;
-      overflow: hidden;
-      pointer-events: none;
-      background:
-        linear-gradient(115deg, transparent 0 8%, rgba(225,29,46,.12) 8.2%, transparent 8.8% 21%, rgba(255,255,255,.025) 21.2%, transparent 22%),
-        linear-gradient(65deg, transparent 0 72%, rgba(112,232,244,.10) 72.2%, transparent 72.8% 89%, rgba(112,232,244,.035) 89.2%, transparent 90%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 2px, transparent 2px 18px),
-        radial-gradient(ellipse at 8% 70%, rgba(225,29,46,.20), transparent 34%),
-        radial-gradient(ellipse at 92% 70%, rgba(112,232,244,.16), transparent 34%),
-        linear-gradient(180deg, #14141b 0%, #09090e 60%, #050507 100%) !important;
-      border-top: 1px solid rgba(210,210,225,.22);
-      box-shadow: 0 -18px 50px rgba(0,0,0,.58);
-    }
-
-    /* Angular edge rails and small HUD-like cuts, kept behind scoreboard text. */
-    body.live-overlay .board-wings::before,
-    body.live-overlay .board-wings::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: min(34vw, 520px);
-      pointer-events: none;
-      opacity: .95;
-    }
-    body.live-overlay .board-wings::before {
-      left: 0;
-      background:
-        linear-gradient(90deg, rgba(225,29,46,.18), transparent 72%),
-        linear-gradient(135deg, transparent 0 18%, rgba(225,29,46,.35) 18.2% 18.6%, transparent 18.8% 36%, rgba(225,29,46,.14) 36.2% 36.5%, transparent 36.8%),
-        repeating-linear-gradient(0deg, transparent 0 28px, rgba(225,29,46,.08) 29px 30px, transparent 31px 46px);
-      border-right: 1px solid rgba(225,29,46,.38);
-      clip-path: polygon(0 0, 100% 0, 93% 12%, 100% 22%, 92% 32%, 100% 44%, 92% 56%, 100% 68%, 93% 82%, 100% 100%, 0 100%);
-    }
-    body.live-overlay .board-wings::after {
-      right: 0;
-      background:
-        linear-gradient(270deg, rgba(112,232,244,.14), transparent 72%),
-        linear-gradient(225deg, transparent 0 18%, rgba(112,232,244,.30) 18.2% 18.6%, transparent 18.8% 36%, rgba(112,232,244,.12) 36.2% 36.5%, transparent 36.8%),
-        repeating-linear-gradient(0deg, transparent 0 28px, rgba(112,232,244,.07) 29px 30px, transparent 31px 46px);
-      border-left: 1px solid rgba(112,232,244,.34);
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7% 82%, 0 68%, 8% 56%, 0 44%, 8% 32%, 0 22%, 7% 12%);
-    }
-
-    /* Raise all scoreboard content above the decorative wings. */
-    body.live-overlay .scoreboard > :not(.board-wings) {
-      position: relative;
-      z-index: 2;
-    }
-    body.live-overlay .scoreboard::before {
-      z-index: 3;
-      left: calc(50% - 50vw) !important;
-      right: calc(50% - 50vw) !important;
-      pointer-events: none;
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .board-wings::before,
-      body.live-overlay .board-wings::after { width: 30vw; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .scoreboard::before { animation: none !important; }
-    }
-  </style>
-
-  <style id="entity-hybrid-polish">
-    /* Hybrid broadcast pass: cinematic Entity atmosphere + readable esports HUD. */
-    :root {
-      --entity-red: 225,29,46;
-      --entity-cyan: 112,232,244;
-      --entity-metal: 190,192,210;
-    }
-
-    /* Give the wings a deeper metallic base and a low-contrast horror haze.
-       The base remains opaque so the game HUD cannot show through the covered area. */
-    body.live-overlay .board-wings {
-      background:
-        radial-gradient(ellipse at 2% 110%, rgba(225,29,46,.28), transparent 42%),
-        radial-gradient(ellipse at 98% 110%, rgba(112,232,244,.23), transparent 42%),
-        radial-gradient(ellipse at 50% 130%, rgba(80,70,92,.20), transparent 58%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 14px),
-        linear-gradient(180deg, #17171f 0%, #0a0a10 60%, #050507 100%) !important;
-      border-top: 1px solid rgba(210,210,225,.28);
-      box-shadow: 0 -20px 55px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.05);
-    }
-
-    /* Fine metallic rails and angled corner accents. */
-    body.live-overlay .board-wings::before,
-    body.live-overlay .board-wings::after {
-      width: min(38vw, 620px);
-      opacity: .9;
-      filter: drop-shadow(0 0 7px rgba(0,0,0,.4));
-    }
-    body.live-overlay .board-wings::before {
-      background:
-        linear-gradient(90deg, rgba(225,29,46,.22), transparent 76%),
-        linear-gradient(135deg, transparent 0 14%, rgba(255,70,85,.48) 14.2% 14.5%, transparent 14.7% 31%, rgba(255,70,85,.18) 31.2% 31.45%, transparent 31.7%),
-        repeating-linear-gradient(0deg, transparent 0 24px, rgba(225,29,46,.09) 25px 26px, transparent 27px 42px);
-      border-right: 1px solid rgba(225,29,46,.46);
-    }
-    body.live-overlay .board-wings::after {
-      background:
-        linear-gradient(270deg, rgba(112,232,244,.19), transparent 76%),
-        linear-gradient(225deg, transparent 0 14%, rgba(112,232,244,.42) 14.2% 14.5%, transparent 14.7% 31%, rgba(112,232,244,.17) 31.2% 31.45%, transparent 31.7%),
-        repeating-linear-gradient(0deg, transparent 0 24px, rgba(112,232,244,.075) 25px 26px, transparent 27px 42px);
-      border-left: 1px solid rgba(112,232,244,.42);
-    }
-
-    /* Tight, legible match metadata. */
-    body.live-overlay .score-meta {
-      min-height: 28px;
-      letter-spacing: .17em;
-      color: #c3c2cf;
-      text-shadow: 0 1px 8px rgba(0,0,0,.9);
-      border-bottom: 1px solid rgba(255,255,255,.07);
-    }
-    body.live-overlay .score-meta .meta-divider { color: #777887; }
-
-    /* Make team panels feel inset into the metal frame, without increasing their height. */
-    body.live-overlay .live-team {
-      overflow: hidden;
-      background-image:
-        repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 1px, transparent 1px 12px),
-        linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.72));
-    }
-    body.live-overlay .live-team[data-role="killer"] {
-      background-color: rgba(37,10,17,.94);
-      box-shadow: inset 0 3px 0 rgba(255,70,85,.9), inset 0 -3px 0 rgba(var(--acc-rgb,225,29,46),.8);
-    }
-    body.live-overlay .live-team[data-role="survivor"] {
-      background-color: rgba(8,26,31,.95);
-      box-shadow: inset 0 3px 0 rgba(112,232,244,.9), inset 0 -3px 0 rgba(var(--acc-rgb,112,232,244),.8);
-    }
-    body.live-overlay .live-team .team-name {
-      font-size: clamp(1.45rem, 2.9vw, 3.15rem);
-      letter-spacing: .045em;
-      line-height: .98;
-      text-shadow: 0 2px 14px rgba(0,0,0,.85);
-    }
-    body.live-overlay .live-team .team-status {
-      color: #a6a5b2;
-      letter-spacing: .13em;
-    }
-    body.live-overlay .live-team .score {
-      font-size: clamp(2.7rem, 6vh, 4.6rem);
-      text-shadow: 0 0 20px rgba(255,255,255,.08);
-    }
-    body.live-overlay .team-role {
-      backdrop-filter: blur(3px);
-      background: rgba(4,4,7,.78);
-      box-shadow: 0 0 18px rgba(0,0,0,.25);
-    }
-
-    /* VS becomes a small energy core rather than a flat label. */
-    body.live-overlay .versus {
-      position: relative;
-      isolation: isolate;
-      background: linear-gradient(180deg, rgba(17,17,24,.98), rgba(5,5,8,.98));
-      border-left: 1px solid rgba(255,255,255,.08);
-      border-right: 1px solid rgba(255,255,255,.08);
-    }
-    body.live-overlay .versus::before {
-      content: "";
-      position: absolute;
-      z-index: -1;
-      width: 90%;
-      aspect-ratio: 1;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-58%);
-      background: radial-gradient(circle, rgba(225,29,46,.22), rgba(112,232,244,.06) 42%, transparent 72%);
-      pointer-events: none;
-    }
-    body.live-overlay .versus .vs {
-      color: #d2d0da;
-      text-shadow: 0 0 12px rgba(225,29,46,.55), 0 0 24px rgba(112,232,244,.12);
-    }
-
-    /* Score extras remain compact and easy to scan. */
-    body.live-overlay .score-extras {
-      border-top: 1px solid rgba(255,255,255,.08);
-      background: linear-gradient(90deg, rgba(225,29,46,.07), rgba(0,0,0,.2) 48%, rgba(112,232,244,.07));
-      color: #b8b7c4;
-      letter-spacing: .06em;
-    }
-    body.live-overlay .score-extras b { color: #f1f0f5; }
-
-    /* Existing score, role-swap, and victory effects get a restrained event-only boost. */
-    body.live-overlay .live-team.scored::after {
-      background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.16), rgba(95,224,160,.25) 25%, transparent 72%);
-    }
-    body.live-overlay .live-team.swapping::after {
-      background: linear-gradient(100deg, transparent 20%, rgba(var(--c),.58) 50%, transparent 80%);
-    }
-    body.live-overlay .win-celebration {
-      background: radial-gradient(ellipse at center, rgba(225,29,46,.34), rgba(4,4,8,.91));
-      backdrop-filter: blur(5px);
-    }
-    body.live-overlay .win-card {
-      border-color: rgba(255,70,85,.8);
-      background: linear-gradient(145deg, rgba(25,13,19,.98), rgba(5,5,8,.98));
-      box-shadow: 0 0 60px rgba(225,29,46,.25), inset 0 0 24px rgba(255,255,255,.025);
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .live-team .team-name { font-size: clamp(1.1rem, 3.5vw, 2rem); }
-      body.live-overlay .score-meta { letter-spacing: .08em; }
-      body.live-overlay .board-wings::before,
-      body.live-overlay .board-wings::after { width: 34vw; }
-    }
-    @media (max-width: 520px) {
-      body.live-overlay .live-team .team-name { font-size: clamp(.95rem, 4.1vw, 1.45rem); }
-      body.live-overlay .score-extras { font-size: .55rem; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .scoreboard::before { animation: none !important; }
-    }
-  </style>
-
-
-  <style id="split-team-end-panels">
-    /* Split broadcast layout: two independent team panels at the far ends. */
-    body.live-overlay .scoreboard {
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      bottom: 0 !important;
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      overflow: visible !important;
-      isolation: isolate;
-    }
-
-    /* Remove all central scoreboard furniture so the teams have clear separation. */
-    body.live-overlay .score-meta,
-    body.live-overlay .score-extras,
-    body.live-overlay .versus,
-    body.live-overlay .board-wings,
-    body.live-overlay .scoreboard::before {
-      display: none !important;
-      content: none !important;
-    }
-
-    body.live-overlay .teams-score {
-      display: grid !important;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-      gap: clamp(28px, 7vw, 140px) !important;
-      align-items: stretch !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: 0 clamp(14px, 2.2vw, 38px) !important;
-      box-sizing: border-box !important;
-      background: transparent !important;
-    }
-
-    body.live-overlay .live-team {
-      position: relative !important;
-      width: 100% !important;
-      min-width: 0 !important;
-      height: clamp(150px, 17vh, 190px) !important;
-      margin: 0 !important;
-      overflow: hidden !important;
-      border: 1px solid rgba(205, 205, 220, .2) !important;
-      background-color: #09090e !important;
-      background-image:
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 13px),
-        linear-gradient(180deg, rgba(17,17,25,.97), rgba(5,5,8,.99)) !important;
-      box-shadow: 0 12px 36px rgba(0,0,0,.48), inset 0 3px 0 rgba(var(--c),.95), inset 0 -3px 0 rgba(var(--acc-rgb,120,120,132),.9) !important;
-    }
-
-    body.live-overlay .live-team.a {
-      justify-self: start !important;
-      background-image:
-        linear-gradient(90deg, rgba(225,29,46,.16), transparent 72%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 13px),
-        linear-gradient(180deg, rgba(17,17,25,.97), rgba(5,5,8,.99)) !important;
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 16%);
-    }
-
-    body.live-overlay .live-team.b {
-      justify-self: end !important;
-      background-image:
-        linear-gradient(270deg, rgba(112,232,244,.14), transparent 72%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 13px),
-        linear-gradient(180deg, rgba(17,17,25,.97), rgba(5,5,8,.99)) !important;
-    }
-
-    body.live-overlay .live-team .team-name {
-      max-width: 100%;
-      overflow-wrap: anywhere;
-      font-size: clamp(1.2rem, 2.5vw, 2.8rem) !important;
-    }
-
-    body.live-overlay .live-team .score {
-      font-size: clamp(2.4rem, 5.5vh, 4.3rem) !important;
-    }
-
-    /* Keep award popups within their respective team half. */
-    body.live-overlay .point-popups {
-      width: 42% !important;
-      z-index: 30;
-    }
-    body.live-overlay .point-popups-a { left: 2% !important; right: auto !important; }
-    body.live-overlay .point-popups-b { right: 2% !important; left: auto !important; }
-
-    @media (max-width: 850px) {
-      body.live-overlay .teams-score {
-        gap: clamp(12px, 3vw, 28px) !important;
-        padding: 0 10px !important;
-      }
-      body.live-overlay .live-team {
-        height: 150px !important;
-        padding: 10px 8px 50px !important;
-      }
-      body.live-overlay .live-team .team-name { font-size: clamp(1rem, 3vw, 1.8rem) !important; }
-    }
-
-    @media (max-width: 520px) {
-      body.live-overlay .teams-score {
-        gap: 10px !important;
-        padding: 0 6px !important;
-      }
-      body.live-overlay .live-team { height: 128px !important; padding: 9px 4px 44px !important; }
-      body.live-overlay .live-team .team-name { font-size: clamp(.82rem, 3.6vw, 1.2rem) !important; }
-      body.live-overlay .live-team .team-logo { display: none !important; }
-    }
-  </style>
-
-  <style id="entity-bottom-panel-upgrade">
-    /* Bottom-panel-only redesign: preserve split layout and all existing data/scripts. */
-    body.live-overlay .scoreboard {
-      bottom: 0 !important;
-      overflow: visible !important;
-    }
-
-    body.live-overlay .teams-score {
-      gap: clamp(30px, 7.2vw, 148px) !important;
-      padding: 0 clamp(18px, 2.6vw, 46px) !important;
-      align-items: stretch !important;
-    }
-
-    body.live-overlay .live-team {
-      --panel-rgb: var(--c, 120, 120, 132);
-      isolation: isolate;
-      height: clamp(184px, 21vh, 230px) !important;
-      min-height: 0 !important;
-      padding: clamp(14px, 1.8vh, 22px) clamp(16px, 2vw, 30px) 66px !important;
-      border: 1px solid rgba(210, 213, 230, .24) !important;
-      border-radius: 2px;
-      background-color: #08090e !important;
-      box-shadow:
-        0 16px 42px rgba(0,0,0,.50),
-        inset 0 2px 0 rgba(var(--c), .96),
-        inset 0 -3px 0 rgba(var(--acc-rgb,120,120,132), .88),
-        inset 0 0 36px rgba(var(--c), .055) !important;
-      transition: height .35s ease, border-color .35s ease, box-shadow .4s ease, filter .4s ease;
-    }
-
-    /* Slightly angular inner edges make the two teams feel like separate broadcast cards. */
-    body.live-overlay .live-team.a {
-      clip-path: polygon(0 0, 100% 0, 97.7% 50%, 100% 100%, 0 100%);
-      border-left: 2px solid rgba(255, 70, 85, .82) !important;
-      background-image:
-        linear-gradient(90deg, rgba(225,29,46,.20), transparent 76%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 13px),
-        linear-gradient(180deg, rgba(18,13,20,.98), rgba(5,5,9,.99)) !important;
-    }
-
-    body.live-overlay .live-team.b {
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 2.3% 50%);
-      border-right: 2px solid rgba(112, 232, 244, .78) !important;
-      background-image:
-        linear-gradient(270deg, rgba(112,232,244,.18), transparent 76%),
-        repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, transparent 1px 13px),
-        linear-gradient(180deg, rgba(12,18,23,.98), rgba(5,5,9,.99)) !important;
-    }
-
-    /* Slow energy sweep over each card. Existing ::after score/swap effects remain untouched. */
-    body.live-overlay .live-team::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      opacity: .78;
-      background:
-        linear-gradient(112deg, transparent 0 31%, rgba(var(--c), 0) 39%, rgba(var(--c), .16) 48%, rgba(255,255,255,.085) 50%, rgba(var(--c), .04) 53%, transparent 64% 100%),
-        linear-gradient(180deg, transparent 0 72%, rgba(var(--c), .07) 100%);
-      background-size: 240% 100%, 100% 100%;
-      background-position: 140% 0, 0 0;
-      animation: entity-panel-energy 9s ease-in-out infinite;
-    }
-
-    body.live-overlay .live-team.b::before {
-      animation-delay: -4.5s;
-    }
-
-    /* Keep text crisp and safely above the decorative layer. */
-    body.live-overlay .live-team > .side-label,
-    body.live-overlay .live-team > .team-name,
-    body.live-overlay .live-team > .team-role,
-    body.live-overlay .live-team > .team-status {
-      position: relative;
-      z-index: 3;
-    }
-
-    body.live-overlay .live-team > .score {
-      z-index: 3;
-      font-size: clamp(3rem, 5.9vh, 4.6rem) !important;
-      bottom: clamp(10px, 1.5vh, 17px) !important;
-      line-height: .88 !important;
-      text-shadow: 0 0 18px rgba(255,255,255,.12);
-    }
-
-    body.live-overlay .live-team .side-label {
-      color: #a7a6b5;
-      letter-spacing: .22em;
-      font-size: clamp(.52rem, .62vw, .68rem);
-    }
-
-    body.live-overlay .live-team .team-name {
-      max-width: 100%;
-      margin: clamp(7px, 1vh, 12px) 0 7px !important;
-      font-size: clamp(1.5rem, 2.8vw, 3.15rem) !important;
-      line-height: .98 !important;
-      letter-spacing: .055em;
-      text-shadow: 0 2px 16px rgba(0,0,0,.95), 0 0 22px rgba(var(--acc-rgb,120,120,132),.22);
-      overflow-wrap: anywhere;
-    }
-
-    body.live-overlay .live-team .team-role {
-      margin: 3px 0 8px !important;
-      padding: 6px 12px !important;
-      min-height: 24px;
-      border-radius: 1px;
-      background: rgba(3,4,7,.88) !important;
-      box-shadow: 0 4px 16px rgba(0,0,0,.3), 0 0 16px rgba(var(--c),.08);
-    }
-
-    body.live-overlay .live-team .team-status {
-      font-size: clamp(.48rem, .58vw, .62rem) !important;
-      letter-spacing: .16em;
-      color: #b9b8c5;
-    }
-
-    body.live-overlay .live-team.has-logo .team-logo {
-      filter: drop-shadow(0 0 15px rgba(var(--acc-rgb,120,120,132),.22));
-    }
-
-    /* Leading side gets a stronger, but restrained, glow. */
-    body.live-overlay .live-team.leading[data-role="killer"] {
-      box-shadow: 0 16px 42px rgba(0,0,0,.52), inset 0 2px 0 rgba(255,70,85,1), inset 0 -3px 0 rgba(var(--acc-rgb,225,29,46),.96), inset 0 0 48px rgba(225,29,46,.12) !important;
-    }
-    body.live-overlay .live-team.leading[data-role="survivor"] {
-      box-shadow: 0 16px 42px rgba(0,0,0,.52), inset 0 2px 0 rgba(112,232,244,1), inset 0 -3px 0 rgba(var(--acc-rgb,112,232,244),.96), inset 0 0 48px rgba(112,232,244,.12) !important;
-    }
-
-    @keyframes entity-panel-energy {
-      0%, 12% { background-position: 140% 0, 0 0; opacity: .48; }
-      48% { opacity: .82; }
-      88%, 100% { background-position: -140% 0, 0 0; opacity: .58; }
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .teams-score {
-        gap: clamp(14px, 3.5vw, 34px) !important;
-        padding: 0 12px !important;
-      }
-      body.live-overlay .live-team {
-        height: 164px !important;
-        padding: 12px 10px 55px !important;
-      }
-      body.live-overlay .live-team .team-name { font-size: clamp(1.08rem, 3.2vw, 1.9rem) !important; }
-      body.live-overlay .live-team .score { font-size: clamp(2.6rem, 6vh, 3.8rem) !important; }
-      body.live-overlay .live-team .team-role { padding: 5px 8px !important; }
-      body.live-overlay .live-team.a { clip-path: polygon(0 0, 100% 0, 97% 50%, 100% 100%, 0 100%); }
-      body.live-overlay .live-team.b { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 3% 50%); }
-    }
-
-    @media (max-width: 520px) {
-      body.live-overlay .teams-score { gap: 9px !important; padding: 0 6px !important; }
-      body.live-overlay .live-team { height: 140px !important; padding: 9px 5px 46px !important; }
-      body.live-overlay .live-team .team-name { font-size: clamp(.82rem, 3.6vw, 1.2rem) !important; letter-spacing: .015em; }
-      body.live-overlay .live-team .team-status { font-size: .42rem !important; letter-spacing: .07em; }
-      body.live-overlay .live-team .team-role { font-size: .42rem !important; padding: 4px 5px !important; }
-      body.live-overlay .live-team .team-logo { display: none !important; }
-      body.live-overlay .live-team .score { font-size: clamp(2.2rem, 9vw, 3.2rem) !important; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .live-team::before { animation: none !important; }
-    }
-  </style>
-
-
-  <style id="inner-edge-score-size-pass">
-    /* Larger split panels, with the scores moved into the open inner corners shown in the reference. */
-    body.live-overlay .teams-score {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-      gap: clamp(22px, 4vw, 82px) !important;
-      padding: 0 clamp(18px, 2vw, 34px) !important;
-      align-items: stretch !important;
-    }
-
-    body.live-overlay .live-team {
-      height: clamp(210px, 24vh, 268px) !important;
-    }
-
-    /* Team A score sits at the inner right; Team B mirrors it at the inner left. */
-    body.live-overlay .live-team.a .score {
-      left: auto !important;
-      right: clamp(20px, 2.4vw, 42px) !important;
-      width: auto !important;
-      top: 50% !important;
-      bottom: auto !important;
-      transform: translateY(-50%);
-      font-size: clamp(3.8rem, 7.5vh, 5.8rem) !important;
-      line-height: .9 !important;
-      text-align: right !important;
-      z-index: 4 !important;
-      text-shadow: 0 0 22px rgba(112,232,244,.22), 0 0 42px rgba(255,255,255,.08);
-    }
-
-    body.live-overlay .live-team.b .score {
-      right: auto !important;
-      left: clamp(20px, 2.4vw, 42px) !important;
-      width: auto !important;
-      top: 50% !important;
-      bottom: auto !important;
-      transform: translateY(-50%);
-      font-size: clamp(3.8rem, 7.5vh, 5.8rem) !important;
-      line-height: .9 !important;
-      text-align: left !important;
-      z-index: 4 !important;
-      text-shadow: 0 0 22px rgba(255,70,85,.18), 0 0 42px rgba(255,255,255,.08);
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .teams-score { gap: clamp(14px, 3vw, 28px) !important; padding: 0 12px !important; }
-      body.live-overlay .live-team { height: 176px !important; }
-      body.live-overlay .live-team.a .score { right: 14px !important; font-size: clamp(3rem, 7vw, 4.2rem) !important; }
-      body.live-overlay .live-team.b .score { left: 14px !important; font-size: clamp(3rem, 7vw, 4.2rem) !important; }
-    }
-
-    @media (max-width: 520px) {
-      body.live-overlay .teams-score { gap: 8px !important; padding: 0 5px !important; }
-      body.live-overlay .live-team { height: 144px !important; }
-      body.live-overlay .live-team.a .score { right: 7px !important; font-size: clamp(2.3rem, 9vw, 3rem) !important; }
-      body.live-overlay .live-team.b .score { left: 7px !important; font-size: clamp(2.3rem, 9vw, 3rem) !important; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .live-team::before { animation: none !important; }
-    }
-  </style>
-
-
-  <style id="physical-team-side-swap">
-    /* Physical side switch: the panels exchange grid slots and FLIP animation moves them across. */
-    body.live-overlay .teams-score {
-      position: relative;
-      perspective: 1200px;
-    }
-    body.live-overlay .teams-score > .live-team.a {
-      grid-column: 1;
-      grid-row: 1;
-    }
-    body.live-overlay .teams-score > .live-team.b {
-      grid-column: 2;
-      grid-row: 1;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.a {
-      grid-column: 2;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.b {
-      grid-column: 1;
-    }
-
-    /* Keep the angular cuts facing the open center gap after the switch. */
-    body.live-overlay .teams-score.sides-swapped > .live-team.a {
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 2.3% 50%);
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.b {
-      clip-path: polygon(0 0, 100% 0, 97.7% 50%, 100% 100%, 0 100%);
-    }
-
-    /* Scores always face the center gap, no matter which side a team occupies. */
-    body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
-      left: clamp(20px, 2.4vw, 42px) !important;
-      right: auto !important;
-      text-align: left !important;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
-      left: auto !important;
-      right: clamp(20px, 2.4vw, 42px) !important;
-      text-align: right !important;
-    }
-
-    /* Logos remain on the outer edge after the cards exchange positions. */
-    body.live-overlay .teams-score.sides-swapped > .live-team.a .team-logo {
-      left: auto !important;
-      right: clamp(8px, 1.4vw, 22px) !important;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.b .team-logo {
-      left: clamp(8px, 1.4vw, 22px) !important;
-      right: auto !important;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.a.has-logo {
-      padding-left: clamp(16px, 2vw, 30px) !important;
-      padding-right: var(--logo-pad) !important;
-    }
-    body.live-overlay .teams-score.sides-swapped > .live-team.b.has-logo {
-      padding-left: var(--logo-pad) !important;
-      padding-right: clamp(16px, 2vw, 30px) !important;
-    }
-
-    /* The old full-panel stinger would cover the movement, so let viewers see the cards swap. */
-    body.live-overlay .side-swap {
-      display: none !important;
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .teams-score.sides-swapped > .live-team.a.has-logo,
-      body.live-overlay .teams-score.sides-swapped > .live-team.b.has-logo {
-        padding-left: 8px !important;
-        padding-right: 8px !important;
-      }
-      body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
-        left: 14px !important;
-        right: auto !important;
-      }
-      body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
-        left: auto !important;
-        right: 14px !important;
-      }
-    }
-    @media (max-width: 520px) {
-      body.live-overlay .teams-score.sides-swapped > .live-team.a .score {
-        left: 7px !important;
-        right: auto !important;
-      }
-      body.live-overlay .teams-score.sides-swapped > .live-team.b .score {
-        left: auto !important;
-        right: 7px !important;
-      }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      body.live-overlay .teams-score > .live-team {
-        scroll-behavior: auto;
-      }
-    }
-  </style>
-
-
-  <style id="requested-role-size-and-position-swap">
-    /* Make KILLER / SURVIVOR role badges much easier to read on stream. */
-    body.live-overlay .live-team .team-role {
-      font-size: clamp(.85rem, 1.15vw, 1.15rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: .12em !important;
-      min-height: 34px !important;
-      padding: 9px 18px !important;
-      margin: 8px 0 10px !important;
-      line-height: 1.1 !important;
-    }
-
-    /* Swap the two vertical anchors: scoreboard at the top, toss banner at the bottom. */
-    body.live-overlay .scoreboard {
-      top: clamp(14px, 3vh, 34px) !important;
-      bottom: auto !important;
-    }
-
-    body.live-overlay .toss-banner {
-      top: auto !important;
-      bottom: clamp(14px, 3vh, 34px) !important;
-      left: 50% !important;
-      right: auto !important;
-      transform: translateX(-50%) !important;
-      max-width: min(92vw, 680px) !important;
-      white-space: normal !important;
-      justify-content: center;
-    }
-
-    @media (max-width: 850px) {
-      body.live-overlay .live-team .team-role {
-        font-size: clamp(.75rem, 1.8vw, 1rem) !important;
-        min-height: 30px !important;
-        padding: 7px 12px !important;
-        letter-spacing: .08em !important;
-      }
-      body.live-overlay .scoreboard {
-        top: 10px !important;
-      }
-      body.live-overlay .toss-banner {
-        bottom: 10px !important;
-      }
-    }
-
-    @media (max-width: 520px) {
-      body.live-overlay .live-team .team-role {
-        font-size: clamp(.62rem, 2.4vw, .82rem) !important;
-        min-height: 26px !important;
-        padding: 6px 8px !important;
-        letter-spacing: .04em !important;
-      }
-      body.live-overlay .scoreboard {
-        top: 6px !important;
-      }
-      body.live-overlay .toss-banner {
-        bottom: 6px !important;
-        max-width: calc(100vw - 12px) !important;
-        gap: 6px;
-        padding: 7px 9px;
-        font-size: .55rem;
-      }
-    }
-  </style>
-
-  <style id="compact-panels-final">
-    /* Compact the two bottom team panels while preserving the split layout. */
-    body.live-overlay .teams-score {
-      gap: clamp(16px, 3.2vw, 58px) !important;
-      padding: 0 clamp(14px, 1.8vw, 28px) !important;
-    }
-    body.live-overlay .live-team {
-      height: clamp(150px, 17vh, 190px) !important;
-      padding: 11px clamp(12px, 1.5vw, 22px) 52px !important;
-    }
-    body.live-overlay .live-team .team-name {
-      font-size: clamp(1.25rem, 2.35vw, 2.65rem) !important;
-      margin: 5px 0 5px !important;
-    }
-    body.live-overlay .live-team .score {
-      font-size: clamp(3rem, 6.2vh, 4.8rem) !important;
-    }
-    body.live-overlay .live-team.a .score {
-      right: clamp(14px, 1.8vw, 30px) !important;
-    }
-    body.live-overlay .live-team.b .score {
-      left: clamp(14px, 1.8vw, 30px) !important;
-    }
-    body.live-overlay .live-team .team-role {
-      min-height: 20px !important;
-      margin: 2px 0 5px !important;
-      padding: 4px 9px !important;
-    }
-    @media (max-width: 850px) {
-      body.live-overlay .teams-score {
-        gap: 12px !important;
-        padding: 0 10px !important;
-      }
-      body.live-overlay .live-team {
-        height: 138px !important;
-        padding: 9px 8px 45px !important;
-      }
-      body.live-overlay .live-team .team-name {
-        font-size: clamp(1rem, 2.8vw, 1.6rem) !important;
-      }
-      body.live-overlay .live-team.a .score {
-        right: 10px !important;
-        font-size: clamp(2.8rem, 6.5vw, 3.8rem) !important;
-      }
-      body.live-overlay .live-team.b .score {
-        left: 10px !important;
-        font-size: clamp(2.8rem, 6.5vw, 3.8rem) !important;
-      }
-    }
-    @media (max-width: 520px) {
-      body.live-overlay .teams-score { gap: 8px !important; padding: 0 5px !important; }
-      body.live-overlay .live-team { height: 116px !important; padding: 7px 4px 38px !important; }
-      body.live-overlay .live-team .team-name { font-size: clamp(.78rem, 3.2vw, 1.05rem) !important; }
-      body.live-overlay .live-team.a .score { right: 6px !important; font-size: clamp(2rem, 8vw, 2.8rem) !important; }
-      body.live-overlay .live-team.b .score { left: 6px !important; font-size: clamp(2rem, 8vw, 2.8rem) !important; }
-      body.live-overlay .live-team .team-role { font-size: .4rem !important; padding: 3px 4px !important; }
-    }
-  </style>
-
-
-  <style id="larger-bottom-toss-winner">
-    /* Larger toss-winner banner, docked at the bottom without changing scoreboard sizing. */
-    body.live-overlay .toss-banner {
-      position: fixed !important;
-      top: auto !important;
-      bottom: clamp(18px, 3vh, 36px) !important;
-      left: 50% !important;
-      right: auto !important;
-      transform: translateX(-50%) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      gap: clamp(12px, 1.5vw, 22px) !important;
-      min-height: clamp(54px, 7vh, 78px) !important;
-      padding: clamp(12px, 1.6vh, 18px) clamp(24px, 3vw, 44px) !important;
-      max-width: min(94vw, 900px) !important;
-      box-sizing: border-box !important;
-      font-size: clamp(.78rem, 1vw, 1rem) !important;
-      letter-spacing: .14em !important;
-      z-index: 50 !important;
-      white-space: normal !important;
-      text-align: center !important;
-      box-shadow: 0 10px 35px rgba(0,0,0,.55), 0 0 24px rgba(244,201,93,.12) !important;
-    }
-    body.live-overlay .toss-banner strong {
-      font-size: clamp(1.35rem, 2vw, 2rem) !important;
-      line-height: 1.05 !important;
-    }
-    body.live-overlay .toss-banner .mini-logo {
-      width: clamp(36px, 4vw, 52px) !important;
-      height: clamp(36px, 4vw, 52px) !important;
-    }
-    @media (max-width: 850px) {
-      body.live-overlay .toss-banner {
-        bottom: 10px !important;
-        max-width: calc(100vw - 20px) !important;
-        gap: 8px !important;
-        padding: 10px 14px !important;
-      }
-    }
-    @media (max-width: 520px) {
-      body.live-overlay .toss-banner {
-        bottom: 8px !important;
-        min-height: 48px !important;
-        padding: 8px 10px !important;
-        gap: 6px !important;
-        font-size: .65rem !important;
-      }
-      body.live-overlay .toss-banner strong { font-size: 1.05rem !important; }
-      body.live-overlay .toss-banner .mini-logo { width: 28px !important; height: 28px !important; }
-      body.live-overlay .toss-banner-advantage { display: none !important; }
-    }
-  </style>
+  <script defer src="../shared/recap.js"></script><script defer src="../shared/live-page.js"></script>
+
+  <style id="overlay-theme">
+/* THE ENTITY CHAMPIONSHIP — live overlay. One consolidated stylesheet.
+   Scoreboard docked top, toss banner docked bottom, logos on outer edges, score plate on inner edges. */
+@property --plate-a { syntax: "<number>"; inherits: true; initial-value: .16; }
+@property --glow    { syntax: "<number>"; inherits: true; initial-value: .05; }
+
+:root {
+  --ov-display: var(--display, "Bebas Neue", Oswald, Impact, "Arial Narrow", sans-serif);
+  --ov-mono: var(--mono, ui-monospace, Menlo, Consolas, monospace);
+  --ov-killer: 255,70,85; --ov-survivor: 112,232,244; --ov-neutral: 140,142,160;
+  --ov-gold: 244,201,93; --ov-win: 95,224,160; --ov-dim: 164,165,182;
+  --ov-card-h: clamp(132px, 14.6vh, 170px);
+  --ov-score-w: clamp(112px, 9vw, 172px);
+  --ov-logo: clamp(92px, 7.6vw, 138px);
+  --ov-pad: clamp(14px, 1.5vw, 26px);
+  --ov-gap: clamp(12px, 1.3vw, 22px);
+  --ov-cut: clamp(14px, 1.5vw, 26px);
+  --ov-top: clamp(14px, 3vh, 34px);
+  --ov-bottom: clamp(18px, 3vh, 36px);
+}
+
+/* ---------- Page + shell ---------- */
+html.overlay-mode, html.overlay-mode body, body.live-overlay {
+  width: 100%; height: 100%; min-height: 100%; margin: 0;
+  background: transparent !important; overflow: hidden !important;
+}
+body.live-overlay { -webkit-font-smoothing: antialiased; }
+body.live-overlay .live-shell {
+  position: fixed !important; inset: 0 !important; margin: 0 auto !important; padding: 0 !important;
+  width: min(1440px, calc(100% - 68px)) !important; height: 100vh !important; height: 100dvh !important;
+  min-height: 0 !important; display: block !important; isolation: isolate; overflow: visible; pointer-events: none;
+}
+body.live-overlay .scoreboard {
+  position: absolute !important; top: var(--ov-top) !important; bottom: auto !important; left: 0 !important; right: 0 !important;
+  width: 100% !important; margin: 0 !important; padding: 0 !important; transform: none !important;
+  background: none !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important;
+  overflow: visible !important; z-index: 5; animation: lp-board-in .9s cubic-bezier(.2,.85,.25,1) both;
+}
+/* Intentionally hidden pieces (kept in the DOM because the scripts still update them) */
+body.live-overlay .score-meta, body.live-overlay .score-extras, body.live-overlay .versus,
+body.live-overlay .board-wings, body.live-overlay .side-swap, .points-schema { display: none !important; }
+body.live-overlay .scoreboard::before, body.live-overlay .scoreboard::after { content: none !important; display: none !important; }
+
+body.live-overlay .teams-score {
+  position: relative; display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+  gap: clamp(16px, 3.2vw, 58px) !important; align-items: stretch !important; perspective: 1200px;
+  width: 100% !important; margin: 0 !important; padding: 0 clamp(14px, 1.8vw, 28px) !important;
+  box-sizing: border-box !important; background: transparent !important;
+}
+body.live-overlay .teams-score > .live-team.a { grid-column: 1; grid-row: 1; }
+body.live-overlay .teams-score > .live-team.b { grid-column: 2; grid-row: 1; }
+body.live-overlay .teams-score.sides-swapped > .live-team.a { grid-column: 2; }
+body.live-overlay .teams-score.sides-swapped > .live-team.b { grid-column: 1; }
+
+/* ---------- Team card ----------
+   Each card is a grid: [logo | name block | score plate], mirrored for whichever slot it occupies.
+   Slot variables below decide the mirroring, so the swap animation needs no extra rules. */
+body.live-overlay .teams-score > .live-team.a,
+body.live-overlay .teams-score.sides-swapped > .live-team.b {            /* LEFT slot */
+  --cols: auto minmax(0,auto) minmax(0,1fr) var(--ov-score-w);
+  --areas: "logo label label score" "logo name name score" "logo role status score";
+  --clip: polygon(0 0, calc(100% - var(--ov-cut)) 0, 100% var(--ov-cut), 100% 100%, 0 100%);
+  --pad: 0 0 0 var(--ov-pad); --grad: 90deg; --ta: left; --js: start; --jc: flex-start; --fd: row;
+  --bar-pos: 0; --div-pos: calc(100% - var(--ov-score-w)); --plate-pos: 100%;
+  --tml: var(--tgap); --tmr: 16px; --rml: var(--tgap); --rmr: 12px; --sml: 0px; --smr: 16px;
+}
+body.live-overlay .teams-score > .live-team.b,
+body.live-overlay .teams-score.sides-swapped > .live-team.a {            /* RIGHT slot */
+  --cols: var(--ov-score-w) minmax(0,1fr) minmax(0,auto) auto;
+  --areas: "score label label logo" "score name name logo" "score status role logo";
+  --clip: polygon(var(--ov-cut) 0, 100% 0, 100% 100%, 0 100%, 0 var(--ov-cut));
+  --pad: 0 var(--ov-pad) 0 0; --grad: 270deg; --ta: right; --js: end; --jc: flex-end; --fd: row-reverse;
+  --bar-pos: 100%; --div-pos: var(--ov-score-w); --plate-pos: 0;
+  --tml: 16px; --tmr: var(--tgap); --rml: 12px; --rmr: var(--tgap); --sml: 16px; --smr: 0px;
+}
+body.live-overlay .live-team { --c: var(--ov-neutral); --tgap: var(--ov-gap); }
+body.live-overlay .live-team:not(.has-logo) { --tgap: 0px; }
+body.live-overlay .live-team[data-role="killer"]   { --c: var(--ov-killer); }
+body.live-overlay .live-team[data-role="survivor"] { --c: var(--ov-survivor); }
+body.live-overlay .live-team.leading { --plate-a: .3; --glow: .16; }
+
+body.live-overlay .live-team {
+  position: relative !important; isolation: isolate; display: grid !important; align-content: center; align-items: center;
+  grid-template-columns: var(--cols) !important; grid-template-rows: auto auto auto !important;
+  grid-template-areas: var(--areas) !important; row-gap: clamp(3px, .6vh, 8px); column-gap: 0;
+  width: 100% !important; min-width: 0 !important; height: var(--ov-card-h) !important; min-height: 0 !important;
+  margin: 0 !important; padding: var(--pad) !important; border: 0 !important; overflow: hidden !important;
+  clip-path: var(--clip);
+  background-color: #07080c !important;
+  background-image:
+    linear-gradient(rgb(var(--c)), rgb(var(--c))),                                   /* outer role bar */
+    linear-gradient(rgba(var(--c), .5), rgba(var(--c), .5)),                         /* plate divider */
+    linear-gradient(180deg, rgba(var(--c), calc(var(--plate-a) + .08)), rgba(var(--c), var(--plate-a))), /* score plate */
+    linear-gradient(var(--grad), rgba(var(--c), .16), transparent 62%),              /* outer tint */
+    repeating-linear-gradient(135deg, rgba(255,255,255,.022) 0 1px, transparent 1px 12px),
+    linear-gradient(180deg, #151620, #07080c) !important;
+  background-size: 4px 100%, 1px 100%, var(--ov-score-w) 100%, 100% 100%, auto, 100% 100% !important;
+  background-position: var(--bar-pos) 0, var(--div-pos) 0, var(--plate-pos) 0, 0 0, 0 0, 0 0 !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, no-repeat !important;
+  box-shadow: inset 0 2px 0 rgba(var(--c), .95), inset 0 -3px 0 rgba(var(--acc-rgb, var(--c)), .9),
+              inset 0 0 0 1px rgba(255,255,255,.06), inset 0 0 50px rgba(var(--c), var(--glow)) !important;
+  transition: --plate-a .5s ease, --glow .5s ease, filter .42s ease;
+}
+body.live-overlay .live-team > * { position: relative; z-index: 3; min-width: 0; margin-top: 0; margin-bottom: 0; }
+
+/* slow energy sweep + event flashes (classes toggled by the scripts) */
+body.live-overlay .live-team::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 48%; z-index: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(var(--c), .14) 45%, rgba(255,255,255,.08) 52%, transparent);
+  translate: -130% 0; animation: ov-sheen 9s ease-in-out infinite;
+}
+body.live-overlay .live-team.b::before { animation-delay: -4.5s; }
+body.live-overlay .live-team::after { content: ""; position: absolute; inset: 0; opacity: 0; pointer-events: none; z-index: 2; }
+body.live-overlay .live-team.scored::after {
+  background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.16), rgba(var(--ov-win), .3) 25%, transparent 72%);
+  animation: lp-flash .9s ease-out;
+}
+body.live-overlay .live-team.swapping::after {
+  background: linear-gradient(100deg, transparent 20%, rgba(var(--c), .58) 50%, transparent 80%);
+  animation: lp-sweep 1.1s .25s ease-in-out;
+}
+.live-team.role-changing { animation: role-panel-pulse .62s ease both; }
+
+/* logo */
+body.live-overlay .live-team .team-logo { grid-area: logo; display: none; position: relative; }
+body.live-overlay .live-team.has-logo .team-logo { display: block; width: var(--ov-logo); height: var(--ov-logo); justify-self: center; align-self: center; }
+.team-logo::before { content: ""; position: absolute; inset: -14%; z-index: -1; background: radial-gradient(circle, rgba(var(--acc-rgb, var(--c)), .32), transparent 66%); }
+.team-logo img { width: 100%; height: 100%; object-fit: contain; scale: 1.18; filter: drop-shadow(0 8px 18px rgba(var(--acc-rgb, 0,0,0), .4)); }
+.team-logo img[hidden] { display: none; }
+.team-logo.logo-in { animation: lp-logo-in .8s cubic-bezier(.2,1.1,.3,1) both; }
+
+/* text block */
+body.live-overlay .live-team .side-label {
+  grid-area: label; display: flex; align-items: center; flex-direction: var(--fd); justify-content: var(--jc); gap: .7em;
+  margin-left: var(--tml); margin-right: var(--tmr);
+  font: 800 clamp(.52rem, .64vw, .68rem)/1 var(--ov-mono); letter-spacing: .26em; color: rgb(var(--ov-dim));
+}
+body.live-overlay .live-team .side-label::before { content: ""; width: 18px; height: 2px; background: rgb(var(--c)); box-shadow: 0 0 8px rgba(var(--c), .6); }
+body.live-overlay .live-team .team-name {
+  grid-area: name; margin-left: var(--tml); margin-right: var(--tmr); padding: 0; text-align: var(--ta);
+  font: 900 clamp(1.5rem, 2.45vw, 2.75rem)/.98 var(--ov-display); letter-spacing: .045em; text-transform: uppercase; color: #fff;
+  overflow-wrap: anywhere; text-shadow: 0 2px 14px rgba(0,0,0,.85), 0 0 24px rgba(var(--acc-rgb, var(--c)), .25);
+}
+body.live-overlay .live-team .team-role {
+  grid-area: role; justify-self: var(--js); display: inline-flex; align-items: center; gap: .6em;
+  margin-left: var(--rml); margin-right: var(--rmr); min-height: 0; padding: .42em .95em .42em .8em;
+  font: 900 clamp(.8rem, .98vw, 1.05rem)/1 var(--ov-display); letter-spacing: .16em; white-space: nowrap;
+  color: rgb(var(--c)); border: 1px solid rgba(var(--c), .55); border-radius: 1px;
+  background: linear-gradient(var(--grad), rgba(var(--c), .22), rgba(var(--c), .04)); box-shadow: 0 0 18px rgba(var(--c), .12);
+  transform-style: preserve-3d; backface-visibility: hidden;
+}
+body.live-overlay .live-team .team-role::before { content: ""; flex: none; width: .5em; height: .5em; background: currentColor; rotate: 45deg; box-shadow: 0 0 8px currentColor; }
+.team-role.role-flip { animation: role-swap-in .62s cubic-bezier(.2,.85,.25,1) both; }
+body.live-overlay .live-team .team-status {
+  grid-area: status; align-self: center; margin-left: var(--sml); margin-right: var(--smr); text-align: var(--ta);
+  font: 700 clamp(.5rem, .62vw, .66rem)/1.2 var(--ov-mono); letter-spacing: .16em; color: rgb(var(--ov-dim));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* score plate (the plate itself is the card background, so the number can pop without scaling a box) */
+body.live-overlay .live-team .score {
+  grid-area: score; align-self: stretch; justify-self: stretch; display: flex; align-items: center; justify-content: center;
+  margin: 0 !important; padding: 0 !important; position: relative !important; inset: auto !important; transform: none !important;
+  font: 900 clamp(3.4rem, 7.6vh, 5.6rem)/1 var(--ov-display); font-variant-numeric: tabular-nums; color: #fff;
+  text-shadow: 0 0 22px rgba(var(--c), .4), 0 3px 0 rgba(0,0,0,.35); transition: text-shadow .5s ease;
+}
+body.live-overlay .live-team.leading .score { text-shadow: 0 0 30px rgba(var(--c), .85), 0 3px 0 rgba(0,0,0,.35); }
+
+/* live-data motion (classes added by the scripts) */
+.lp-tick { animation: lp-tick .55s cubic-bezier(.2,1.3,.4,1); }
+.lp-bump { animation: lp-bump .75s cubic-bezier(.2,1.4,.4,1); }
+
+/* ---------- Point popups ---------- */
+.score-popups, .point-popups { z-index: 30; }
+.point-popups { position: absolute; top: 50%; width: 42%; height: 0; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.point-popups-a { left: 2%; right: auto; } .point-popups-b { right: 2%; left: auto; }
+.live-shell.sides-swapped .point-popups-a { left: auto; right: 2%; }
+.live-shell.sides-swapped .point-popups-b { right: auto; left: 2%; }
+.point-popup {
+  position: absolute; white-space: nowrap; font: 900 clamp(2.4rem, 6vh, 4.6rem)/1 var(--ov-display); color: rgb(var(--ov-win));
+  text-shadow: 0 0 22px rgba(var(--ov-win), .6), 0 3px 0 rgba(0,0,0,.45); animation: point-pop 2.4s ease-out forwards;
+}
+
+/* ---------- Toss banner (bottom) ---------- */
+body.live-overlay .toss-banner {
+  --ov-bevel: clamp(14px, 1.6vw, 26px);
+  position: fixed !important; top: auto !important; bottom: var(--ov-bottom) !important; left: 50% !important; right: auto !important;
+  transform: translateX(-50%) !important; z-index: 50 !important;
+  display: flex !important; align-items: center; justify-content: center; gap: clamp(10px, 1.2vw, 20px);
+  box-sizing: border-box; max-width: min(94vw, 900px); min-height: clamp(52px, 6.4vh, 74px); margin: 0; border: 0;
+  padding: clamp(10px, 1.4vh, 16px) calc(clamp(22px, 2.6vw, 42px) + var(--ov-bevel));
+  background: linear-gradient(180deg, rgba(24,22,31,.97), rgba(6,6,10,.98)); color: #fff;
+  clip-path: polygon(var(--ov-bevel) 0, calc(100% - var(--ov-bevel)) 0, 100% 50%, calc(100% - var(--ov-bevel)) 100%, var(--ov-bevel) 100%, 0 50%);
+  box-shadow: inset 0 2px 0 rgba(var(--ov-gold), .95), inset 0 -2px 0 rgba(var(--ov-gold), .3);
+  font: 800 clamp(.62rem, .8vw, .8rem)/1.1 var(--ov-mono); letter-spacing: .16em; white-space: normal; text-align: center;
+  animation: lp-banner-in .8s .35s cubic-bezier(.2,.85,.25,1) both;
+}
+.toss-banner-mark { color: rgb(var(--ov-killer)); }
+.toss-banner-label { color: rgb(var(--ov-dim)); padding-right: clamp(10px, 1.2vw, 18px); border-right: 1px solid rgba(255,255,255,.16); }
+.toss-banner-advantage { color: #d6d6de; }
+body.live-overlay .toss-banner strong {
+  font: 900 clamp(1.4rem, 2.1vw, 2.1rem)/1.05 var(--ov-display); letter-spacing: .08em; text-transform: uppercase;
+  color: rgb(var(--ov-gold)); text-shadow: 0 0 22px rgba(var(--ov-gold), .35);
+}
+.mini-logo { width: clamp(34px, 3.6vw, 50px); height: clamp(34px, 3.6vw, 50px); object-fit: contain; scale: 1.2; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+.mini-logo[hidden], .win-logo[hidden] { display: none; }
+
+/* ---------- Win celebration (full screen) ---------- */
+.win-celebration {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(var(--ov-killer), .32), rgba(3,3,6,.92) 75%);
+  backdrop-filter: blur(6px); animation: win-in .5s ease both;
+}
+.win-celebration[hidden] { display: none; }
+.win-celebration::before { content: ""; position: absolute; left: 50%; top: 50%; width: 30vmin; height: 30vmin; margin: -15vmin 0 0 -15vmin; border-radius: 50%; border: 3px solid rgb(var(--ov-gold)); animation: lp-shock 1.4s ease-out both; }
+.win-particles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.win-particles i { position: absolute; top: -10px; width: 6px; height: 14px; background: rgb(var(--ov-gold)); opacity: .9; animation: win-fall linear infinite; }
+.win-particles i:nth-child(3n) { background: rgb(var(--ov-killer)); } .win-particles i:nth-child(3n+1) { background: #fff; }
+.win-card {
+  position: relative; text-align: center; min-width: min(720px, 86vw); padding: clamp(26px, 4.5vh, 46px) clamp(40px, 6vw, 96px);
+  border: 1px solid rgba(var(--ov-killer), .7); background: linear-gradient(150deg, rgba(30,14,20,.98), rgba(6,6,10,.98));
+  box-shadow: inset 0 3px 0 rgb(var(--ov-gold)), 0 0 70px rgba(var(--ov-killer), .3);
+  animation: lp-win-card .9s cubic-bezier(.2,1.2,.3,1) both;
+}
+.win-card::before, .win-card::after { content: ""; position: absolute; width: 28px; height: 28px; border: 0 solid rgb(var(--ov-gold)); }
+.win-card::before { left: -1px; bottom: -1px; border-width: 0 0 3px 3px; } .win-card::after { right: -1px; bottom: -1px; border-width: 0 3px 3px 0; }
+.win-logo { display: block; width: clamp(90px, 16vh, 150px); height: clamp(90px, 16vh, 150px); object-fit: contain; margin: 0 auto 4px; scale: 1.15; filter: drop-shadow(0 0 26px rgba(var(--acc-rgb, 255,70,85), .55)); }
+.win-kicker { display: flex; align-items: center; justify-content: center; gap: 14px; font: 800 .66rem var(--ov-mono); letter-spacing: .28em; color: rgb(var(--ov-killer)); }
+.win-kicker span { width: clamp(30px, 5vw, 70px); height: 1px; background: linear-gradient(90deg, transparent, currentColor); }
+.win-kicker span:last-child { background: linear-gradient(270deg, transparent, currentColor); }
+.win-title { margin-top: 14px; font: 900 clamp(1.2rem, 2.4vw, 2rem) var(--ov-display); letter-spacing: .34em; color: #c6c6d0; }
+.win-name { margin: 10px 0; font: 900 clamp(3rem, 9vw, 7rem)/.9 var(--ov-display); text-transform: uppercase; color: #fff; overflow-wrap: anywhere; text-shadow: 0 0 40px rgba(255,255,255,.3); }
+.win-subtitle { font: 800 .72rem var(--ov-mono); letter-spacing: .34em; color: rgb(var(--ov-gold)); }
+
+/* ---------- Keyframes (names kept so scripts keep working) ---------- */
+@keyframes ov-sheen { 0%,12% { translate: -130% 0; opacity: 0; } 18%,62% { opacity: 1; } 70%,100% { translate: 300% 0; opacity: 0; } }
+@keyframes lp-board-in { from { opacity: 0; translate: 0 -46px; } to { opacity: 1; translate: 0 0; } }
+@keyframes lp-banner-in { from { opacity: 0; translate: 0 30px; } to { opacity: 1; translate: 0 0; } }
+@keyframes lp-tick { 0% { opacity: .15; scale: .84; filter: blur(3px); } 60% { scale: 1.07; filter: blur(0); } 100% { opacity: 1; scale: 1; } }
+@keyframes lp-bump { 0% { scale: 1; } 30% { scale: 1.3; color: #5fe0a0; text-shadow: 0 0 34px rgba(95,224,160,.85); } 100% { scale: 1; } }
+@keyframes lp-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lp-sweep { 0% { opacity: 1; transform: translateX(-100%); } 99% { opacity: 1; } 100% { opacity: 0; transform: translateX(100%); } }
+@keyframes lp-logo-in { from { opacity: 0; scale: .55; rotate: -10deg; } to { opacity: 1; scale: 1; rotate: 0deg; } }
+@keyframes role-swap-in {
+  0% { opacity: .15; transform: perspective(500px) rotateX(-88deg) translateY(7px) scale(.9); filter: blur(4px); }
+  58% { opacity: 1; transform: perspective(500px) rotateX(12deg) translateY(-2px) scale(1.05); filter: blur(0); }
+  100% { opacity: 1; transform: perspective(500px) rotateX(0) translateY(0) scale(1); }
+}
+@keyframes role-panel-pulse { 0% { filter: brightness(.8); } 45% { filter: brightness(1.3); } 100% { filter: brightness(1); } }
+@keyframes point-pop { 0% { opacity: 0; transform: translateY(24px) scale(.6); } 15% { opacity: 1; transform: translateY(0) scale(1.15); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-80px) scale(1); } }
+@keyframes win-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes win-fall { to { transform: translateY(110vh) rotate(540deg); } }
+@keyframes lp-win-card { from { opacity: 0; scale: .7; filter: blur(8px); } to { opacity: 1; scale: 1; filter: blur(0); } }
+@keyframes lp-shock { from { scale: .2; opacity: .9; } to { scale: 4.5; opacity: 0; } }
+
+/* ---------- Smaller screens ---------- */
+@media (max-width: 850px) {
+  :root { --ov-card-h: 116px; --ov-score-w: 92px; --ov-pad: 12px; --ov-gap: 12px; --ov-cut: 14px; --ov-top: 10px; --ov-bottom: 10px; }
+  body.live-overlay .live-shell { width: calc(100% - 24px) !important; }
+  body.live-overlay .teams-score { gap: 12px !important; padding: 0 !important; }
+  body.live-overlay .live-team .team-logo, body.live-overlay .live-team.has-logo .team-logo { display: none !important; }
+  body.live-overlay .live-team { --tgap: 0px; }
+  body.live-overlay .live-team .team-name { font-size: clamp(1.05rem, 3.2vw, 1.7rem); }
+  body.live-overlay .live-team .team-role { font-size: clamp(.66rem, 1.8vw, .9rem); }
+  body.live-overlay .live-team .score { font-size: clamp(2.6rem, 7vw, 3.8rem); }
+  .toss-banner-advantage { display: none; }
+}
+@media (max-width: 520px) {
+  :root { --ov-card-h: 98px; --ov-score-w: 70px; --ov-top: 6px; --ov-bottom: 8px; }
+  body.live-overlay .live-shell { width: calc(100% - 14px) !important; }
+  body.live-overlay .teams-score { gap: 8px !important; }
+  body.live-overlay .live-team .side-label, body.live-overlay .live-team .team-status { display: none; }
+  body.live-overlay .live-team .team-name { font-size: clamp(.85rem, 3.8vw, 1.15rem); }
+  body.live-overlay .live-team .team-role { font-size: .58rem; letter-spacing: .08em; }
+  body.live-overlay .live-team .score { font-size: clamp(2.1rem, 9vw, 2.8rem); }
+  body.live-overlay .toss-banner { gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.live-overlay .live-team::before, body.live-overlay .scoreboard, body.live-overlay .toss-banner,
+  .team-role.role-flip, .live-team.role-changing, .team-logo.logo-in, .win-card, .win-celebration::before { animation: none !important; }
+}
+</style>
 
 </head>
 
@@ -2294,6 +1057,17 @@
 
     })();
 
+  </script>
+
+
+  <script id="popup-side-sync">
+    (() => {
+      const grid = document.querySelector('.teams-score'), shell = document.querySelector('.live-shell');
+      if (!grid || !shell || !('MutationObserver' in window)) return;
+      const sync = () => shell.classList.toggle('sides-swapped', grid.classList.contains('sides-swapped'));
+      new MutationObserver(sync).observe(grid, { attributes: true, attributeFilter: ['class'] });
+      sync();
+    })();
   </script>
 
 </body>

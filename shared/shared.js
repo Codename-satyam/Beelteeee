@@ -237,6 +237,65 @@
     };
   }
 
+  // ---------- Activity log + undo ----------
+  // Every scoring change records a compact "before" snapshot of only the matches it can touch, so the
+  // newest change can be undone with one click. The log lives inside the synced state (state.auditLog),
+  // so both streamers see the same history. It also exports to CSV for VOD editors.
+  const AUDIT_MAX = 60;
+  const SNAP_TARGET = ['scorecard', 'scoreA', 'scoreB', 'status', 'winnerId', 'tiebreakWinnerId'];
+  const SNAP_ANCESTOR = ['teamAId', 'teamBId', 'scorecard', 'scoreA', 'scoreB', 'status', 'winnerId', 'tiebreakWinnerId', 'toss', 'roles', 'mapVeto', 'setupComplete'];
+  const SNAP_STATUS = ['status'];
+  function who() { return (session && session.user && session.user.email) || 'local'; }
+  function pickFields(match, keys) { const out = {}; keys.forEach((k) => { out[k] = match[k] === undefined ? null : clone(match[k]); }); return out; }
+  // Call at the START of a mutator, before changing anything. opts: { game, kind, moment, withAncestors }
+  function auditRecord(state, label, matchId, opts) {
+    opts = opts || {};
+    const target = state.matches.find((m) => m.id === matchId);
+    const snaps = new Map();
+    if (target) {
+      snaps.set(target.id, SNAP_TARGET);
+      if (opts.withAncestors) {
+        let p = target;
+        while (p && p.parentMatchId) { snaps.set(p.parentMatchId, SNAP_ANCESTOR); p = state.matches.find((m) => m.id === p.parentMatchId); }
+      }
+    }
+    state.matches.forEach((m) => { if (m.status === 'in_progress' && !snaps.has(m.id)) snaps.set(m.id, SNAP_STATUS); });
+    const entry = {
+      id: uid('log'), at: new Date().toISOString(), who: who(), kind: opts.kind || 'score', label,
+      matchId: matchId || null, game: opts.game || null, moment: opts.moment || '',
+      matchLabel: target ? `${teamName(state, target.teamAId)} vs ${teamName(state, target.teamBId)}` : '',
+      prev: { activeMatchId: state.activeMatchId || null, matches: [...snaps].map(([id, keys]) => ({ id, fields: pickFields(state.matches.find((m) => m.id === id) || {}, keys) })) },
+      undone: false
+    };
+    state.auditLog = (state.auditLog || []).concat(entry).slice(-AUDIT_MAX);
+    return entry;
+  }
+  function auditList(state) { return (state && state.auditLog) || []; }
+  function auditLastUndoable(state) {
+    const log = auditList(state);
+    for (let i = log.length - 1; i >= 0; i--) if (log[i].prev && !log[i].undone) return log[i];
+    return null;
+  }
+  // Restores the newest undoable change. Returns that entry, or null when there is nothing to undo.
+  function auditUndo(state) {
+    const entry = auditLastUndoable(state);
+    if (!entry) return null;
+    entry.prev.matches.forEach((snap) => {
+      const match = state.matches.find((m) => m.id === snap.id);
+      if (match) Object.keys(snap.fields).forEach((k) => { match[k] = clone(snap.fields[k]); });
+    });
+    state.activeMatchId = entry.prev.activeMatchId;
+    entry.undone = true;
+    state.auditLog = state.auditLog.concat({ id: uid('log'), at: new Date().toISOString(), who: who(), kind: 'undo', label: `Undid: ${entry.label}`, matchId: entry.matchId, game: entry.game, moment: '', matchLabel: entry.matchLabel, undone: false }).slice(-AUDIT_MAX);
+    return entry;
+  }
+  function auditCsv(state) {
+    const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const rows = [['timestamp_utc', 'who', 'match', 'game', 'change', 'moment', 'status']];
+    auditList(state).forEach((e) => rows.push([e.at, e.who, e.matchLabel, e.game ? `Game ${e.game}` : '', e.label, e.moment || '', e.kind === 'undo' ? 'undo' : (e.undone ? 'undone' : 'active')]));
+    return rows.map((r) => r.map(q).join(',')).join('\r\n');
+  }
+
   function randInt(max) {
     if (window.crypto && crypto.getRandomValues) {
       const limit = Math.floor(4294967296 / max) * max;
@@ -500,6 +559,8 @@
     setSideChoice,
     rolesFor,
     activeMatch,
+    who,
+    audit: { record: auditRecord, list: auditList, lastUndoable: auditLastUndoable, undo: auditUndo, toCsv: auditCsv },
     cloud: { configured: isCloudConfigured, get client() { return supabaseClient; }, get isController() { return authorized; }, get status() { return cloudStatus; } }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCloud, { once: true }); else initCloud();
