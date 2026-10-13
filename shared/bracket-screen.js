@@ -93,7 +93,14 @@
       .sort((a, b) => a.roundIndex - b.roundIndex || a.matchNumber - b.matchNumber)[0];
     $('bs-live').textContent = live ? nm(live) : (final ? 'TOURNAMENT COMPLETE' : 'NO MATCH LIVE');
     $('bs-next').textContent = next ? nm(next) : (final ? '—' : 'AWAITING RESULTS');
-    const eliminated = real.filter((m) => m.status === 'completed').length;
+    // Out = latest result was a loss AND no match left to play (a rematch keeps a team alive).
+    const lastLost = new Map(), hasOpen = new Set();
+    real.slice().sort((a, b) => a.roundIndex - b.roundIndex || a.matchNumber - b.matchNumber).forEach((m) => {
+      if (m.status === 'completed' && m.winnerId) {
+        [m.teamAId, m.teamBId].forEach((id) => { if (id) lastLost.set(id, id !== m.winnerId); });
+      } else { [m.teamAId, m.teamBId].forEach((id) => { if (id) hasOpen.add(id); }); }
+    });
+    const eliminated = [...lastLost].filter(([id, lost]) => lost && !hasOpen.has(id)).length;
     $('bs-alive').textContent = `${state.teams.length - eliminated} OF ${state.teams.length}`;
 
     fitToScreen();

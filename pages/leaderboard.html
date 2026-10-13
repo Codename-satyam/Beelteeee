@@ -118,7 +118,7 @@ const CHANNEL   = 'entity-championship-sync-v1';
    "/Images/" = project root on your deployed site, "../Images/" = one level up from this page. */
 const LOGO_DIRS = ['/Images/', '../Images/', 'Images/', '/images/', '../images/', 'images/'];
 const TEAMS = {                           // a word in the team's name → logo file + accent colour (r,g,b)
-  boys:{file:'Boys.png',acc:'245,197,24'}, eternity:{file:'eternity.png',acc:'139,123,255'}, hakle:{file:'Hakle.png',acc:'255,59,59'},
+  boys:{file:'Boys.png',acc:'245,197,24'}, hakle:{file:'Hakle.png',acc:'255,59,59'},
   nicesu:{file:'Nicesu.png',acc:'255,162,26'}, onyx:{file:'Onyx.png',acc:'166,120,255'}, vibes:{file:'Vibes.png',acc:'255,63,180'},
   vrty:{file:'Vrty.png',acc:'61,242,192'}, yo:{file:'Yo.png',acc:'255,122,46'}
 };
@@ -163,7 +163,9 @@ function resolveLogo(team) {
 const labelFor = (r, R) => (r === R - 1 ? 'FINAL' : r === R - 2 ? 'SEMIS' : r === R - 3 ? 'QUARTERS' : 'ROUND ' + (r + 1));
 function normalize(raw) {
   if (!raw || !Array.isArray(raw.teams) || !raw.teams.length) return null;
-  const rows = new Map(raw.teams.map((t) => [t.id, { id:t.id, name:t.name || 'TBD', w:0, l:0, pf:0, pa:0, live:false, champ:false, cells:[] }]));
+  const rows = new Map(raw.teams.map((t) => [t.id, { id:t.id, name:t.name || 'TBD', w:0, l:0, pf:0, pa:0, live:false, champ:false, open:false, last:null, cells:[] }]));
+  // A round can hold two matches for one team (a rematch): keep the earlier result on the cell as history.
+  const putCell = (t, r, cell) => { const old = t.cells[r]; if (old) { const h = [...(old.hist || [])]; if (old.s === 'win' || old.s === 'loss') h.push({ s:old.s, pts:old.pts, oppPts:old.oppPts, opp:old.opp }); if (h.length) cell.hist = h; } t.cells[r] = cell; };
   const ms = Array.isArray(raw.matches) ? raw.matches : [];
   const p = 2 ** Math.ceil(Math.log2(Math.max(2, raw.teams.length))), sizes = []; for (let s = p / 2; s >= 1; s /= 2) sizes.push(s);
   const rounds = ms.map((m) => (Number.isInteger(m.round) ? m.round : Number.isInteger(m.roundIndex) ? m.roundIndex : null)), base = Math.min(...rounds.filter((x) => x !== null));
@@ -172,16 +174,16 @@ function normalize(raw) {
 
   ms.forEach((m, i) => {
     const r = roundOf(m, i), a = rows.get(m.teamAId), b = rows.get(m.teamBId);
-    if (!a || !b) { const t = a || b; if (t) t.cells[r] = r === 0 ? { s:'bye' } : { s:'next', opp:'' }; return; }   // lone team: bye in round 1, otherwise waiting
+    if (!a || !b) { const t = a || b; if (t && !t.cells[r]) t.cells[r] = r === 0 ? { s:'bye' } : { s:'next', opp:'' }; if (t && !isDone(m)) t.open = true; return; }   // lone team: bye in round 1, otherwise waiting
     total++;
     const live = m.status === 'in_progress'; if (live) { a.live = b.live = true; }
-    if (!isDone(m)) { a.cells[r] = { s: live ? 'live' : 'next', opp:b.name }; b.cells[r] = { s: live ? 'live' : 'next', opp:a.name }; if (curRound < 0 || r < curRound) curRound = r; return; }
+    if (!isDone(m)) { a.open = b.open = true; putCell(a, r, { s: live ? 'live' : 'next', opp:b.name }); putCell(b, r, { s: live ? 'live' : 'next', opp:a.name }); if (curRound < 0 || r < curRound) curRound = r; return; }
     finished++;
     const sc = scoresOf(m), w = winnerOf(m, sc);
     if (sc) { a.pf += sc.a; a.pa += sc.b; b.pf += sc.b; b.pa += sc.a; }
-    if (w === a.id) { a.w++; b.l++; } else if (w === b.id) { b.w++; a.l++; }
-    a.cells[r] = { s: w === a.id ? 'win' : 'loss', pts: sc ? sc.a : null, opp:b.name };
-    b.cells[r] = { s: w === b.id ? 'win' : 'loss', pts: sc ? sc.b : null, opp:a.name };
+    if (w === a.id) { a.w++; b.l++; a.last = 'w'; b.last = 'l'; } else if (w === b.id) { b.w++; a.l++; b.last = 'w'; a.last = 'l'; }
+    putCell(a, r, { s: w === a.id ? 'win' : 'loss', pts: sc ? sc.a : null, oppPts: sc ? sc.b : null, opp:b.name });
+    putCell(b, r, { s: w === b.id ? 'win' : 'loss', pts: sc ? sc.b : null, oppPts: sc ? sc.a : null, opp:a.name });
   });
   const last = ms[ms.length - 1];
   if (last && rows.get(last.teamAId) && rows.get(last.teamBId) && isDone(last)) { const w = winnerOf(last, scoresOf(last)); if (rows.get(w)) rows.get(w).champ = true; }
@@ -189,10 +191,11 @@ function normalize(raw) {
 
   const list = [...rows.values()].map((t) => {
     let run = 0; const cum = [0];                                               // running total after each finished round
-    for (let r = 0; r < R; r++) { const c = t.cells[r]; if (c && (c.s === 'win' || c.s === 'loss')) { run += c.pts || 0; cum.push(run); } else if (c && c.s === 'bye') cum.push(run); else break; }
+    for (let r = 0; r < R; r++) { const c = t.cells[r]; if (c && (c.s === 'win' || c.s === 'loss')) { run += (c.pts || 0) + (c.hist || []).reduce((n, h) => n + (h.pts || 0), 0); cum.push(run); }
+      else if (c && c.hist && c.hist.length) { run += c.hist.reduce((n, h) => n + (h.pts || 0), 0); cum.push(run); } else if (c && c.s === 'bye') cum.push(run); else break; }
     const cells = []; let dead = false;
     for (let r = 0; r < R; r++) { const c = t.cells[r]; if (dead) cells.push({ s:'none' }); else { cells.push(c || { s:'none' }); if (c && c.s === 'loss') dead = true; } }
-    return { ...t, cells, cum, out: !t.champ && t.l > 0, diff: t.pf - t.pa };
+    return { ...t, cells, cum, out: !t.champ && t.last === 'l' && !t.open, rematch: !t.champ && t.l > 0 && t.last === 'l' && t.open, diff: t.pf - t.pa };
   });
   list.sort((x, y) => (y.champ - x.champ) || (y.w - x.w) || (x.out - y.out) || (y.pf - x.pf) || (y.diff - x.diff) || x.name.localeCompare(y.name));
   return { rows: list, R, labels: Array.from({ length: R }, (_, r) => labelFor(r, R)), curRound: curRound < 0 ? R - 1 : curRound,
@@ -208,8 +211,9 @@ function tween(el, to, fmt) {
   (function step(t) { const k = Math.min(1, (t - t0) / 900); el.textContent = fmt(Math.round(from + (to - from) * k)); if (k < 1) requestAnimationFrame(step); })(t0);
 }
 const sgn = (n) => (n > 0 ? '+' : '') + n;
-const cellHtml = (c) => ({ win:`<b>${c.pts ?? '✓'}</b><small>beat ${esc(c.opp)}</small>`, loss:`<b>${c.pts ?? '✕'}</b><small>lost to ${esc(c.opp)}</small>`,
-  live:`<b>LIVE</b><small>vs ${esc(c.opp)}</small>`, bye:`<b>BYE</b><small>advanced</small>`, next:`<b>—</b><small>${c.opp ? 'vs ' + esc(c.opp) : 'waiting'}</small>`, none:`<b>—</b>` }[c.s]);
+const histHtml = (c) => (c.hist || []).map((h) => `<small class="hist" style="opacity:.65">earlier ${h.pts ?? '?'}–${h.oppPts ?? '?'} ${h.s === 'win' ? 'beat' : 'lost to'} ${esc(h.opp)}</small>`).join('');
+const cellHtml = (c) => ({ win:`<b>${c.pts ?? '✓'}</b><small>beat ${esc(c.opp)}</small>${histHtml(c)}`, loss:`<b>${c.pts ?? '✕'}</b><small>lost to ${esc(c.opp)}</small>`,
+  live:`<b>LIVE</b><small>vs ${esc(c.opp)}</small>${histHtml(c)}`, bye:`<b>BYE</b><small>advanced</small>`, next:`<b>${(c.hist && c.hist.length) ? 'REMATCH' : '—'}</b><small>${c.opp ? 'vs ' + esc(c.opp) : 'waiting'}</small>${histHtml(c)}`, none:`<b>—</b>` }[c.s]);
 function spark(cum, R, max) {
   const W = 100, H = 36, x = (i) => 4 + i * (W - 8) / R, y = (v) => H - 5 - (v / max) * (H - 10), pts = cum.map((v, i) => x(i) + ',' + y(v)), e = cum.length - 1;
   return `<svg viewBox="0 0 ${W} ${H}"><line x1="4" y1="${H - 5}" x2="${W - 4}" y2="${H - 5}"/>${cum.length > 1 ? `<polyline points="${pts.join(' ')}"/>` : ''}<circle cx="${x(e)}" cy="${y(cum[e])}" r="3.2"/></svg>`;
@@ -235,8 +239,8 @@ function render(st) {
     el.style.setProperty('--i', i);
     el.className = 'row' + (i < 3 ? ' p' + (i + 1) : '') + (r.champ ? ' champ' : '') + (r.out ? ' out' : '') + (r.live ? ' live' : '') + (el.classList.contains('moved') ? ' moved' : '');
     const rk = el.querySelector('.rank'); rk.firstChild ? (rk.firstChild.nodeValue = i + 1) : rk.append(String(i + 1));
-    el.querySelector('.who span').textContent = r.champ ? 'CHAMPION' : r.live ? 'LIVE NOW' : r.out ? 'ELIMINATED' : 'STILL ALIVE';
-    const prevSig = el._sig || [], sig = r.cells.map((c) => c.s + ':' + (c.pts ?? ''));
+    el.querySelector('.who span').textContent = r.champ ? 'CHAMPION' : r.live ? 'LIVE NOW' : r.out ? 'ELIMINATED' : r.rematch ? 'REMATCH PENDING' : 'STILL ALIVE';
+    const prevSig = el._sig || [], sig = r.cells.map((c) => c.s + ':' + (c.pts ?? '') + ':' + ((c.hist || []).length));
     el.querySelector('.cells').innerHTML = r.cells.map((c) => `<div class="cell ${c.s}">${cellHtml(c)}</div>`).join('');
     el.querySelectorAll('.cell').forEach((c, k) => { if (!first && /^(win|loss)/.test(sig[k]) && sig[k] !== prevSig[k]) c.classList.add('fresh'); });   // a new round result lands
     el._sig = sig;
@@ -263,15 +267,16 @@ function ingest(raw) { try { const n = normalize(raw), k = JSON.stringify(n); if
 const readLocal = () => { try { if (window.Entity) return Entity.load(); return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } };
 const setConn = (ok, txt) => { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; };
 
-if (params.get('demo')) {                                                                // ?demo=1 plays a fake 8-team tournament
+if (params.get('demo')) {                                                                // ?demo=1 plays a fake 7-team tournament
   setConn(true, 'Demo mode');
-  const names = ['The Boys','Eternity','Hakle','Nicesu','Onyx','Vibes','Vrty','Yo'], wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const names = ['The Boys','Hakle','Nicesu','Onyx','Vibes','Vrty','Yo'], wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const mk = (id, a, b) => ({ id, teamAId:a, teamBId:b, status:'pending' });
-  const raw = { teams: names.map((n, i) => ({ id:'t' + i, name:n })), matches:[mk('m1','t0','t1'), mk('m2','t2','t3'), mk('m3','t4','t5'), mk('m4','t6','t7'), mk('m5',null,null), mk('m6',null,null), mk('m7',null,null)] };
+  const raw = { teams: names.map((n, i) => ({ id:'t' + i, name:n })), matches:[mk('m1','t0','t1'), mk('m2','t2','t3'), mk('m3','t4','t5'), mk('m4','t6',null), mk('m5',null,null), mk('m6',null,null), mk('m7',null,null)] };
   const feed = { m1:['m5','teamAId'], m2:['m5','teamBId'], m3:['m6','teamAId'], m4:['m6','teamBId'], m5:['m7','teamAId'], m6:['m7','teamBId'] };
   (async () => {
     ingest(raw); await wait(2500);
     for (const m of raw.matches) {
+      if (!m.teamAId || !m.teamBId) { const w = m.teamAId || m.teamBId; if (w && feed[m.id]) raw.matches.find((x) => x.id === feed[m.id][0])[feed[m.id][1]] = w; ingest(raw); continue; }   // bye
       m.status = 'in_progress'; ingest(raw); await wait(2200);
       const a = 20 + Math.floor(Math.random() * 20), b = 20 + Math.floor(Math.random() * 20); Object.assign(m, { status:'completed', scoreA:a, scoreB:a === b ? b + 1 : b });
       m.winnerId = m.scoreA > m.scoreB ? m.teamAId : m.teamBId;
