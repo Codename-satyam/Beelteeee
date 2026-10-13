@@ -3506,57 +3506,116 @@
 
 
   <script id="win-celebration-fallback">
-    /* Safety net: when a match completes and nothing has opened the celebration,
-       open it here. Styling/confetti come from the existing victory controller. */
+    /* Opens the victory scene when a match finishes, without depending on the shared script.
+       Two independent detectors (match data + what the scoreboard itself displays).
+       Debug: debugCelebration() in the console; test the look: previewWinCelebration('Name'). */
     (() => {
-      const el = document.getElementById('win-celebration');
-      const nameEl = document.getElementById('celebration-winner');
+      const $ = (id) => document.getElementById(id);
+      const el = $('win-celebration'), nameEl = $('celebration-winner');
       if (!el || !nameEl) return;
-      const shownFor = new Set();
-      let primed = false, hideTimer;
+      const t0 = Date.now();
+      const GRACE = 3500;                 // ignore the initial page-load fill-in so a refresh doesn't replay the scene
+      const seen = new Set();
+      let primed = false, hideTimer, lastShow = 0;
+      const txt = (id) => ($(id)?.textContent || '').trim();
+      const log = (...a) => console.info('[celebration]', ...a);
 
-      const winnerOf = (state, m) => {
-        const id = m.winnerId ?? m.winnerTeamId ?? m.winner?.id ?? (typeof m.winner === 'string' ? m.winner : null);
-        if (id != null && window.Entity && Entity.teamName) {
-          const n = Entity.teamName(state, id);
-          if (n) return n;
-        }
-        return m.winnerName || m.winnerTeam || (typeof m.winner === 'string' ? m.winner : null);
-      };
-      const isDone = (m) => {
-        const st = String(m.status ?? m.state ?? '').toLowerCase();
-        return ['completed', 'complete', 'finished', 'final', 'done'].includes(st) || m.completed === true || m.finished === true;
-      };
-      const show = (name) => {
-        nameEl.textContent = name;
+      const show = (name, why) => {
+        if (Date.now() - lastShow < 12000) return;       // never re-trigger while one is running
+        lastShow = Date.now();
+        nameEl.textContent = name || 'WINNER';
         el.hidden = false;
+        log('opened for', name, '-', why);
       };
-
-      // Close the scene 10s after it opens, whoever opened it.
       new MutationObserver(() => {
         clearTimeout(hideTimer);
         if (!el.hidden) hideTimer = setTimeout(() => { el.hidden = true; }, 10000);
       }).observe(el, { attributes: true, attributeFilter: ['hidden'] });
 
-      const check = (state) => {
-        if (!state || !Array.isArray(state.matches)) return;
+      /* ---- detector 1: match data ---- */
+      const DONE = ['completed', 'complete', 'finished', 'final', 'done', 'ended', 'over'];
+      const nonEmpty = (v) => v !== null && v !== undefined && v !== '' && v !== false;
+      function winnerKey(m) {
+        for (const k of Object.keys(m)) if (/winner/i.test(k) && nonEmpty(m[k])) return k;
+        if (m.result && typeof m.result === 'object') for (const k of Object.keys(m.result)) if (/winner/i.test(k) && nonEmpty(m.result[k])) return 'result.' + k;
+        return null;
+      }
+      function isDone(m) {
+        const st = String(m.status ?? m.state ?? m.phase ?? '').toLowerCase();
+        return DONE.includes(st) || m.completed === true || m.finished === true || !!m.completedAt || !!m.finishedAt
+          || m.scorecard?.game2?.confirmed === true || winnerKey(m) !== null;
+      }
+      function nameFromData(state, m) {
+        const k = winnerKey(m);
+        let v = k ? (k.startsWith('result.') ? m.result[k.slice(7)] : m[k]) : null;
+        if (v && typeof v === 'object') v = v.name ?? v.teamName ?? v.id ?? null;
+        if (v != null && window.Entity && Entity.teamName) {
+          const n = Entity.teamName(state, v);
+          if (n && n !== v) return n;
+        }
+        if (typeof v === 'string' && v) {
+          if (v === m.teamAId) return txt('team-a-name');
+          if (v === m.teamBId) return txt('team-b-name');
+          return v;
+        }
+        return null;
+      }
+      function onState(state) {
+        if (!state || !Array.isArray(state.matches) || !state.matches.length) return;
+        const grace = Date.now() - t0 < GRACE;
         state.matches.forEach((m) => {
-          if (!isDone(m)) return;
-          const name = winnerOf(state, m);
-          if (!name) return;
-          if (!primed) { shownFor.add(m.id); return; }   // don't replay already-finished matches on reload
-          if (shownFor.has(m.id)) return;
-          shownFor.add(m.id);
-          setTimeout(() => { if (el.hidden) show(name); }, 600);
+          if (!m || !isDone(m)) return;
+          if (!primed || grace) { seen.add(m.id); return; }
+          if (seen.has(m.id)) return;
+          seen.add(m.id);
+          const n = nameFromData(state, m) || winnerFromScoreboard();
+          setTimeout(() => show(n, 'match data'), 600);
         });
         primed = true;
+      }
+
+      /* ---- detector 2: what the scoreboard itself shows ---- */
+      function winnerFromScoreboard() {
+        const d = txt('winner-detail');
+        const m = d.match(/winner\s*[·:\-–—|]\s*(.+)$/i);
+        if (m && !/pending|tbd|^[-–—·\s]*$/i.test(m[1])) return m[1].trim();
+        const a = parseFloat(txt('team-a-score')), b = parseFloat(txt('team-b-score'));
+        if (isFinite(a) && isFinite(b) && a !== b) return txt(a > b ? 'team-a-name' : 'team-b-name');
+        return null;
+      }
+      let domDoneKey = null;
+      function onDom() {
+        if (Date.now() - t0 < GRACE) { domDoneKey = currentDomKey(); return; }
+        const key = currentDomKey();
+        if (key && key !== domDoneKey) {
+          domDoneKey = key;
+          const n = winnerFromScoreboard();
+          if (n) show(n, 'scoreboard');
+        } else if (!key) domDoneKey = null;
+      }
+      function currentDomKey() {
+        const state = txt('match-state'), d = txt('winner-detail');
+        const winnerShown = /winner\s*[·:\-–—|]\s*\S/i.test(d) && !/pending|tbd/i.test(d);
+        const stateDone = /complete|final|finish|ended|over/i.test(state);
+        return (winnerShown || stateDone) ? (txt('team-a-name') + '|' + txt('team-b-name') + '|' + d + '|' + state) : null;
+      }
+      ['winner-detail', 'match-state'].forEach((id) => {
+        const n = $(id);
+        if (n) new MutationObserver(onDom).observe(n, { childList: true, characterData: true, subtree: true });
+      });
+
+      window.previewWinCelebration = (name) => { lastShow = 0; show(name || 'TEAM NAME', 'preview'); };
+      window.debugCelebration = () => {
+        const st = window.Entity && Entity.load ? Entity.load() : null;
+        const m = st && window.Entity && Entity.activeMatch ? Entity.activeMatch(st) : null;
+        console.log('activeMatch:', m ? JSON.parse(JSON.stringify(m)) : m);
+        console.log('scoreboard:', { state: txt('match-state'), winner: txt('winner-detail'), a: txt('team-a-name') + ' ' + txt('team-a-score'), b: txt('team-b-name') + ' ' + txt('team-b-score') });
+        console.log('isDone(activeMatch):', m ? isDone(m) : null, 'winnerKey:', m ? winnerKey(m) : null);
       };
 
-      window.previewWinCelebration = (name) => show(name || 'TEAM NAME');
       window.addEventListener('load', () => {
-        if (!window.Entity || !Entity.subscribe) return;
-        Entity.subscribe(check);
-        check(Entity.load());
+        if (window.Entity && Entity.subscribe) { Entity.subscribe(onState); onState(Entity.load()); }
+        else log('Entity not found: shared scripts did not load, data detector is off (scoreboard detector still active)');
       }, { once: true });
     })();
   </script>
