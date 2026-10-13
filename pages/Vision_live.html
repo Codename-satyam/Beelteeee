@@ -3136,6 +3136,21 @@
     body.live-overlay .teams-score.sides-swapped > .live-team.b .team-role,
     body.live-overlay .teams-score.sides-swapped > .live-team.b .team-status { left: 29% !important; right: auto !important; }
   </style>
+
+
+  <style id="scoreboard-lift-fix">
+    /* Lift the complete scoreboard and both team panels, leaving clear space below. */
+    body.live-overlay .scoreboard {
+      bottom: clamp(64px, 7vh, 82px) !important;
+    }
+    @media (max-width: 850px) {
+      body.live-overlay .scoreboard { bottom: 42px !important; }
+    }
+    @media (max-width: 520px) {
+      body.live-overlay .scoreboard { bottom: 30px !important; }
+    }
+  </style>
+
 </body>
 
 </html>
