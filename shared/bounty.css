@@ -1,0 +1,19 @@
+.bounty-card {
+  --red: #ff2a3d;
+  --bg: #070709;
+  border: 1px solid #332;
+  background: var(--bg);
+  padding: 1rem;
+  color: #d1d1cf;
+  transition: transform 0.3s ease;
+}
+.bounty-card.killer { border-color: var(--red); }
+.bounty-card .reward { color: var(--red); font-weight: bold; }
+/* Tentacle border snippet */
+.bounty-card::after {
+  content: "";
+  position: absolute;
+  top: -5px; left: -5px; right: -5px; bottom: -5px;
+  border: 2px solid transparent;
+  border-image: linear-gradient(45deg, var(--red), transparent) 1;
+}

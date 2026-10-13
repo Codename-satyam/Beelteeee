@@ -40,12 +40,13 @@
   function stageFor(match) {
     if (!match.toss) return 'toss';
     if (match.mapVeto && match.mapVeto.finalMap) return 'done';
-    if (!match.roles) return 'side';   // toss winner must choose Killer / Survivor first
+    if (!match.roles) return 'side';
+    if (!match.bounties) return 'bounty';
     return 'maps';
   }
 
   function setActiveMarker(stage) {
-    const order = { toss: 0, side: 1, maps: 2, done: 3 };
+    const order = { toss: 0, side: 1, bounty: 2, maps: 3, done: 4 };
     document.querySelectorAll('[data-step-marker]').forEach((element) => {
       const key = element.dataset.stepMarker;
       element.classList.toggle('active', key === stage);
@@ -124,12 +125,26 @@
       return;
     }
 
-    $('toss-status').textContent = stage === 'done' ? 'Map locked' : stage === 'toss' ? 'Awaiting toss' : stage === 'side' ? 'Choose side' : 'Map voting';
-    $('toss-status').className = stage === 'done' ? 'status completed' : (stage === 'toss' || stage === 'side') ? 'status pending' : 'status in_progress';
+    $('toss-status').textContent = stage === 'done' ? 'Map locked' : stage === 'toss' ? 'Awaiting toss' : stage === 'side' ? 'Choose side' : stage === 'bounty' ? 'Bounty' : 'Map voting';
+    $('toss-status').className = stage === 'done' ? 'status completed' : (stage === 'toss' || stage === 'side' || stage === 'bounty') ? 'status pending' : 'status in_progress';
     if (stage === 'toss') renderTossStage(state, match, teams);
     else if (stage === 'side') renderSideStage(state, match, teams);
+    else if (stage === 'bounty') renderBountyStage(state, match, teams);
     else if (stage === 'maps') renderMapStage(state, match, teams);
     else renderDoneStage(state, match, teams);
+  }
+
+  async function renderBountyStage(state, match, teams) {
+    if (!match.bounties) {
+       $('wizard').innerHTML = `<section class="panel ceremony-empty"><div class="eyebrow">Stage 03 / The Entity's Bounty</div><h3>THE ENTITY DEMANDS A PRICE</h3><p>Draw the contracts to determine the bonus points for this trial.</p><button class="button primary" data-action="draw-bounties">DRAW THE CONTRACTS →</button></section>`;
+       return;
+    }
+    const bounties = match.bounties;
+    $('wizard').innerHTML = `<section class="panel map-veto-panel">
+      <div class="veto-head"><h3>THE ENTITY'S BOUNTY</h3></div>
+      <div class="draft-grid map-grid">${bounties.map(b => `<div class="bounty-card ${esc(b.side)}"><strong>${esc(b.name)}</strong><small>${esc(b.description)}</small><span class="reward">+${b.reward}</span></div>`).join('')}</div>
+      <div class="actions"><button class="button primary" data-action="continue-bounty">Continue to map veto →</button></div>
+    </section>`;
   }
 
   function renderTossStage(state, match, teams) {
@@ -279,8 +294,15 @@
     });
   }
 
-  function restartSetup() {
-    const existing = findMatch(Entity.load(), selectedId);
+  async function drawBounties() {
+    if (!selectedId) return;
+    const { match } = currentMatchAndState();
+    const bounties = await BountyManager.drawBounties(match);
+    Entity.update((state) => {
+        const match = findMatch(state, selectedId);
+        if (match) match.bounties = bounties;
+    });
+  }
     if (!existing) return;
     if (existing.status === 'completed') {
       window.alert('This match is completed. Correct the result in bracket control or rebuild the bracket before restarting setup.');
@@ -317,6 +339,8 @@
     if (!button || button.disabled) return;
     const action = button.dataset.action;
     if (action === 'flip') flipToss();
+    if (action === 'draw-bounties') drawBounties();
+    if (action === 'continue-bounty') render();
     if (action === 'init-map-pool') initializeMapVeto();
     if (action === 'ban-map') banMap(button.dataset.map);
     if (action === 'choose-side') chooseSide(button.dataset.role);

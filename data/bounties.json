@@ -1,0 +1,35 @@
+[
+  {
+    "id": "huntress_deadeye",
+    "name": "Deadeye",
+    "side": "killer",
+    "eligibleKillers": ["huntress"],
+    "description": "Down two survivors using thrown hatchets.",
+    "reward": 5,
+    "enabled": true
+  },
+  {
+    "id": "artist_murder_crows",
+    "name": "Murder of Crows",
+    "side": "killer",
+    "description": "Secure two qualifying downs following Dire Crow hits.",
+    "reward": 5,
+    "enabled": true
+  },
+  {
+    "id": "survivor_guardian_angel",
+    "name": "Guardian Angel",
+    "side": "survivor",
+    "description": "Safely unhook a teammate during the Endgame Collapse and escape with that teammate.",
+    "reward": 5,
+    "enabled": true
+  },
+  {
+    "id": "survivor_field_medic",
+    "name": "Field Medic",
+    "side": "survivor",
+    "description": "Fully heal two injured teammates.",
+    "reward": 5,
+    "enabled": true
+  }
+]

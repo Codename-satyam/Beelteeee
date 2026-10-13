@@ -4,8 +4,10 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#070709"><title>Match Ceremony — The VNC Trials</title>
   <link rel="stylesheet" href="../shared/shared.css">
+  <link rel="stylesheet" href="../shared/bounty.css">
   <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="../shared/shared.js"></script>
+  <script defer src="../shared/bounty-manager.js"></script>
   <script defer src="../shared/toss-page.js"></script>
   <style id="ban-slash-admin">
     /* Banned maps on the admin page: dimmed, X-slashed, tagged with who banned them. */
@@ -40,7 +42,7 @@
       <div class="field"><label for="match-select">Active bracket match</label><select id="match-select"><option value="">Generate a bracket first</option></select></div>
       <div id="match-summary" class="notice">Your bracket matchup will appear here.</div>
       <div class="ceremony-steps" aria-label="Match flow">
-        <span data-step-marker="toss">01 · TOSS</span><span data-step-marker="side">02 · CHOOSE SIDE</span><span data-step-marker="maps">03 · MAP VETO</span><span data-step-marker="done">04 · SCORE</span>
+        <span data-step-marker="toss">01 · TOSS</span><span data-step-marker="side">02 · SIDE</span><span data-step-marker="bounty">03 · BOUNTY</span><span data-step-marker="maps">04 · MAP VETO</span><span data-step-marker="done">05 · DONE</span>
       </div>
     </section>
 
