@@ -3,273 +3,639 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#06060a">
 <title>Map Veto — Live Scene — The VNC Trials</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="ban-slash.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <script defer src="../shared/supabase-config.js"></script><script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="../shared/shared.js"></script>
 <style>
-  :root { --bg:#070709; --panel:#121216; --line:#26262d; --text:#f2f2f4; --dim:#8b8b96; --red:#ff2a3d; --gold:#f5c542; }
-  * { box-sizing:border-box; margin:0 }
-  html,body { height:100%; background:var(--bg); color:var(--text); font-family:Barlow,system-ui,sans-serif; overflow:hidden }
-  body.transparent { background:transparent } /* add ?bg=transparent for OBS overlays */
-  .stage { height:100%; display:grid; grid-template-rows:auto 1fr auto; padding:3vh 3.5vw; gap:2.5vh;
-    background:radial-gradient(ellipse at 50% -10%, #2a0a10 0%, transparent 60%) }
-  .head { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:2vw }
-  .team { font:800 clamp(28px,4.6vw,76px)/1 'Barlow Condensed',sans-serif; letter-spacing:.01em; transition:opacity .4s, color .4s }
-  .team.b { text-align:right }
-  .team.turn { color:var(--red) }
-  .team.dim { opacity:.4 }
-  .mid { text-align:center; font:600 clamp(14px,1.6vw,24px) Barlow; color:var(--dim); min-width:18vw }
-  .mid strong { display:block; color:var(--text); font:700 clamp(18px,2.2vw,34px) 'Barlow Condensed'; margin-top:.3em }
+  /* =====================================================================
+     THE VNC TRIALS — live toss / side choice / map veto scene
+     Fixed 1920×1080 stage, scaled to fit any window or OBS source.
+     URL options:  ?bg=transparent  (OBS)   ?demo=1  (self-playing preview)   ?match=<id>  (pin a match)
+     ===================================================================== */
+  :root {
+    --bg:#06060a; --panel:#0f0f14; --line:#262630; --text:#f4f4f6; --dim:#8d8d99; --mute:#5b5b67;
+    --red:#ff2a3d; --red2:#ff5566; --gold:#f5c542; --ok:#5fe0a0;
+    --kill:255,70,85; --surv:112,232,244;
+    --display:'Barlow Condensed','Arial Narrow',Impact,sans-serif; --body:Barlow,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+  body.transparent{background:transparent}
+  body.transparent .bg,body.transparent .grain,body.transparent .vignette{display:none}
 
-  .body { position:relative; min-height:0 }
-  .scene { position:absolute; inset:0; display:none }
-  .scene.on { display:flex }
+  .canvas{position:absolute;left:50%;top:50%;width:1920px;height:1080px;flex:none;
+    transform-origin:center;transform:translate(-50%,-50%) scale(var(--s,1));
+    display:grid;grid-template-rows:auto auto 1fr auto;gap:14px;padding:30px 64px 20px;overflow:hidden}
 
-  /* ---------- toss ---------- */
-  #toss { flex-direction:column; align-items:center; justify-content:center; gap:5vh; perspective:1400px }
-  .coin-wrap { --d:min(28vh,26vw); width:var(--d); height:var(--d); position:relative; margin-top:14vh }
-  .coin { position:absolute; inset:0; transform-style:preserve-3d }
-  .coin s, .coin i { position:absolute; inset:0; border-radius:50%; display:block; text-decoration:none }
-  .coin s { background:#b98a16; border:3px solid #8f6a0e }                       /* edge layers = thickness */
-  .coin i { backface-visibility:hidden; display:grid; place-content:center; justify-items:center; gap:.1em; text-align:center;
-    font:800 calc(var(--d)*.2)/1 'Barlow Condensed'; letter-spacing:.04em; color:#2b1d00;
-    background:radial-gradient(circle at 32% 28%, #fff4b8, var(--gold) 42%, #a37a14 100%); border:calc(var(--d)*.035) solid #c99a1c;
-    box-shadow:inset 0 0 0 calc(var(--d)*.04) rgba(255,255,255,.2), inset 0 0 calc(var(--d)*.12) rgba(120,80,0,.55) }
-  .coin i::before { content:"✦"; font-size:.7em; opacity:.75 }
-  .coin i.front { transform:translateZ(7px) }
-  .coin i.back  { transform:rotateX(180deg) translateZ(7px) }
-  .coin-shadow { position:absolute; left:10%; right:10%; bottom:-9vh; height:3.2vh; border-radius:50%;
-    background:radial-gradient(ellipse, rgba(0,0,0,.65), transparent 70%); transform-origin:center }
-  .coin-wrap::after { content:""; position:absolute; inset:-6%; border-radius:50%; border:4px solid var(--gold); opacity:0; pointer-events:none }
+  /* ---------- atmosphere ---------- */
+  .bg{position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% -12%,rgba(255,42,61,.20),transparent 62%),
+      radial-gradient(ellipse 40% 40% at 8% 100%,rgba(255,42,61,.08),transparent 70%),
+      radial-gradient(ellipse 40% 40% at 96% 90%,rgba(112,232,244,.05),transparent 70%),
+      linear-gradient(180deg,#09090d,#050508)}
+  .bg::before{content:"";position:absolute;inset:-20%;opacity:.5;
+    background:radial-gradient(ellipse 30% 20% at 30% 60%,rgba(255,255,255,.035),transparent 70%),
+               radial-gradient(ellipse 35% 22% at 70% 40%,rgba(255,255,255,.03),transparent 70%);
+    animation:fog 26s ease-in-out infinite alternate}
+  @keyframes fog{from{transform:translate(-3%,2%) scale(1)}to{transform:translate(4%,-3%) scale(1.12)}}
+  .grain{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.5;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px)}
+  .vignette{position:absolute;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 0 220px rgba(0,0,0,.75)}
+  .canvas>header,.canvas>nav,.canvas>main,.canvas>footer{position:relative;z-index:2}
 
-  .coin-wrap.throw { animation:arc 2.6s linear forwards }
-  .coin-wrap.throw .coin { animation:spin 2.6s cubic-bezier(.15,.6,.25,1) forwards }
-  .coin-wrap.throw .coin-shadow { animation:shade 2.6s linear forwards }
-  .coin-wrap.heads { --end:2160deg } .coin-wrap.tails { --end:2340deg }       /* 6 spins = heads up, 6.5 = tails up */
-  .coin-wrap.land::after { animation:ring .9s ease-out forwards }
-  .coin-wrap.land .coin { filter:drop-shadow(0 0 40px rgba(245,197,66,.55)) }
+  /* ---------- header: team plates ---------- */
+  .top{display:grid;grid-template-columns:1fr 440px 1fr;align-items:center;gap:6px;height:152px}
+  .pw{--acc:255,42,61;transition:filter .5s,opacity .5s}
+  .pw.dim{opacity:.42}
+  .pw.turn{filter:drop-shadow(0 0 22px rgba(var(--acc),.6))}
+  .plate{position:relative;display:flex;align-items:center;gap:24px;height:140px;padding:0 44px 0 26px;
+    background:linear-gradient(90deg,rgba(var(--acc),.20),rgba(15,15,20,.94) 72%);
+    border-top:2px solid rgba(var(--acc),.55);border-bottom:1px solid rgba(var(--acc),.18);
+    clip-path:polygon(0 0,calc(100% - 38px) 0,100% 100%,0 100%);transition:background .5s}
+  .pw.b .plate{flex-direction:row-reverse;text-align:right;padding:0 26px 0 44px;
+    background:linear-gradient(270deg,rgba(var(--acc),.20),rgba(15,15,20,.94) 72%);
+    clip-path:polygon(38px 0,100% 0,100% 100%,0 100%)}
+  .pw.turn .plate::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
+    background:linear-gradient(90deg,transparent,rgb(var(--acc)),transparent);background-size:200% 100%;animation:sweep 1.8s linear infinite}
+  @keyframes sweep{from{background-position:200% 0}to{background-position:-200% 0}}
+  .logo{position:relative;flex:none;width:104px;height:104px;display:grid;place-items:center;
+    background:rgba(255,255,255,.04);border:1px solid rgba(var(--acc),.4);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+  .logo img{width:88%;height:88%;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,.6))}
+  .logo i{font:900 44px var(--display);font-style:normal;color:rgb(var(--acc));letter-spacing:.04em}
+  .tinfo{min-width:0;display:grid;gap:5px;align-content:center}
+  .role{justify-self:start;display:none;font:700 20px var(--display);letter-spacing:.24em;padding:2px 14px 1px;border:1px solid;text-transform:uppercase}
+  .pw.b .role{justify-self:end}
+  .role.killer{display:inline-block;color:#ff7882;border-color:rgba(var(--kill),.75);background:rgba(var(--kill),.14)}
+  .role.survivor{display:inline-block;color:#7eeaf5;border-color:rgba(var(--surv),.7);background:rgba(var(--surv),.12)}
+  .tname{font:900 62px/.95 var(--display);letter-spacing:.015em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:470px}
+  .tname.long{font-size:46px}
+  .ttag{font:700 19px var(--display);letter-spacing:.2em;color:var(--dim);min-height:1.1em;text-transform:uppercase}
+  .ttag.toss{color:var(--gold)}
+  .ttag.hot{color:rgb(var(--acc));animation:blink 1.1s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.35}}
 
-  @keyframes arc {
-    0%   { transform:translateY(0);     animation-timing-function:cubic-bezier(.2,.7,.3,1) }
-    42%  { transform:translateY(-34vh); animation-timing-function:cubic-bezier(.7,0,.9,.4) }
-    80%  { transform:translateY(0);     animation-timing-function:ease-out }
-    90%  { transform:translateY(-4.5vh);animation-timing-function:ease-in }
-    100% { transform:translateY(0) } }
-  @keyframes spin  { from { transform:rotateX(0) } to { transform:rotateX(var(--end)) } }
-  @keyframes shade { 0%,100% { transform:scale(1); opacity:1 } 42% { transform:scale(.35); opacity:.35 } 80% { transform:scale(1); opacity:1 } 90% { transform:scale(.8); opacity:.7 } }
-  @keyframes ring  { from { transform:scale(.9); opacity:.9 } to { transform:scale(1.9); opacity:0 } }
+  .center{text-align:center;display:grid;gap:5px;justify-items:center}
+  .kicker{font:700 17px var(--display);letter-spacing:.34em;color:var(--red2);text-transform:uppercase}
+  .phase{font:900 58px/1 var(--display);letter-spacing:.05em;text-transform:uppercase;transition:opacity .3s}
+  .turnline{font:600 24px var(--display);letter-spacing:.14em;color:var(--dim);text-transform:uppercase;min-height:1.2em}
+  .turnline em{font-style:normal;color:var(--text)}
 
-  .toss-line { font:800 clamp(30px,6vh,80px) 'Barlow Condensed'; text-align:center; min-height:1.2em }
-  .toss-line em { font-style:normal; color:var(--red) }
-  .toss-line.dim { color:var(--dim); font-size:clamp(20px,3.4vh,44px); letter-spacing:.2em }
-  .toss-line.pop { animation:pop .5s cubic-bezier(.2,1.4,.4,1) }
-  .toss-result { font:700 clamp(18px,3vh,40px) 'Barlow Condensed'; letter-spacing:.2em; color:var(--gold); min-height:1.2em }
-  @keyframes pop { from { transform:scale(.7); opacity:0 } to { transform:scale(1); opacity:1 } }
+  /* ---------- progress rail ---------- */
+  .steps{display:flex;justify-content:center;gap:12px}
+  .step{display:flex;align-items:center;gap:10px;padding:7px 26px 6px;font:700 17px var(--display);letter-spacing:.24em;color:var(--mute);
+    border-bottom:3px solid #20202a;transition:color .4s,border-color .4s}
+  .step b{font:800 17px var(--display);opacity:.7}
+  .step.done{color:#9a9aa6;border-color:rgba(95,224,160,.55)}
+  .step.on{color:var(--text);border-color:var(--red)}
+  .step.on.gold{border-color:var(--gold);color:var(--gold)}
 
-  /* ---------- veto ---------- */
-  #veto { flex-direction:column; gap:2vh }
-  .grid { flex:1; min-height:0; display:grid; gap:1.4vw; grid-template-columns:repeat(var(--cols,4),1fr); align-content:center }
-  .map-card { position:relative; overflow:hidden; border:2px solid var(--line); background:var(--panel); aspect-ratio:16/10;
-    display:flex; align-items:flex-end; transition:border-color .3s, transform .3s }
-  .map-card .map-art { position:absolute; inset:0; background-size:cover; background-position:center; transition:filter .5s ease .25s }
-  .map-card .map-art::after { content:""; position:absolute; inset:0; background:linear-gradient(transparent 40%, rgba(0,0,0,.85)) }
-  .map-card .name { position:relative; padding:1.2vh 1.2vw; font:800 clamp(18px,2.6vw,42px)/1 'Barlow Condensed'; letter-spacing:.02em }
-  .map-card .by { position:absolute; top:1vh; left:1vw; font:700 clamp(11px,1.1vw,16px) 'Barlow Condensed'; letter-spacing:.12em; color:var(--red);
-    background:rgba(0,0,0,.65); padding:.3em .7em; display:none }
-  .map-card.banned { border-color:#3a1218 }
-  .map-card.banned .name { color:var(--dim) }
-  .map-card.banned .by { display:block }
-  .map-card.final { border-color:var(--gold); transform:scale(1.04) }
+  /* ---------- scenes ---------- */
+  .body{position:relative;min-height:0}
+  .scene{position:absolute;inset:0;display:none}
+  .scene.on{display:flex;animation:sceneIn .6s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes sceneIn{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
 
-  /* ---------- final ---------- */
-  #done { flex-direction:column; align-items:center; justify-content:center; gap:2vh; text-align:center }
-  #done .label { font:600 clamp(16px,2vw,28px) Barlow; color:var(--dim) }
-  #done .big { font:800 clamp(64px,16vh,200px)/.95 'Barlow Condensed'; color:var(--gold); animation:pop .7s cubic-bezier(.2,1.4,.4,1) }
-  #done .vs { font:700 clamp(20px,3vw,44px) 'Barlow Condensed' }
+  /* ready / idle */
+  #idle,#ready{flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+  .ready-vs{font:900 280px/.9 var(--display);color:transparent;-webkit-text-stroke:2px rgba(255,42,61,.5);letter-spacing:.04em;animation:breathe 4s ease-in-out infinite}
+  @keyframes breathe{50%{-webkit-text-stroke-color:rgba(255,42,61,.9);text-shadow:0 0 70px rgba(255,42,61,.25)}}
+  .ready-line{font:700 34px var(--display);letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+  .ready-line em{font-style:normal;color:var(--text)}
+  .idle-mark{font:900 130px/1 var(--display);letter-spacing:.08em;color:#15151b;text-shadow:0 0 1px #2a2a33}
 
-  .foot { display:flex; justify-content:space-between; color:var(--dim); font:600 clamp(11px,1.1vw,15px) Barlow }
-  .dot { display:inline-block; width:.6em; height:.6em; border-radius:50%; background:#555; margin-right:.5em }
-  .dot.live { background:var(--red); animation:blink 1.4s infinite }
-  @keyframes blink { 50% { opacity:.25 } }
-  @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-delay:0s !important } }
+  /* coin toss */
+  #toss{flex-direction:column;align-items:center;justify-content:center;gap:26px;perspective:1600px}
+  .coin-wrap{--d:300px;width:var(--d);height:var(--d);position:relative;margin-top:90px}
+  .coin{position:absolute;inset:0;transform-style:preserve-3d}
+  .coin s,.coin i{position:absolute;inset:0;border-radius:50%;display:block;text-decoration:none}
+  .coin s{background:#b98a16;border:3px solid #8f6a0e}
+  .coin i{backface-visibility:hidden;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;font:900 58px/1 var(--display);font-style:normal;letter-spacing:.06em;color:#2b1d00;
+    background:radial-gradient(circle at 32% 28%,#fff4b8,var(--gold) 42%,#a37a14 100%);border:10px solid #c99a1c;
+    box-shadow:inset 0 0 0 12px rgba(255,255,255,.18),inset 0 0 36px rgba(120,80,0,.55)}
+  .coin i::before{content:"✦";font-size:.7em;opacity:.7}
+  .coin i.front{transform:translateZ(7px)} .coin i.back{transform:rotateX(180deg) translateZ(7px)}
+  .coin-shadow{position:absolute;left:10%;right:10%;bottom:-70px;height:34px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.7),transparent 70%)}
+  .coin-wrap::after{content:"";position:absolute;inset:-6%;border-radius:50%;border:4px solid var(--gold);opacity:0;pointer-events:none}
+  .coin-wrap.throw{animation:arc 2.6s linear forwards}
+  .coin-wrap.throw .coin{animation:spin 2.6s cubic-bezier(.15,.6,.25,1) forwards}
+  .coin-wrap.throw .coin-shadow{animation:shade 2.6s linear forwards}
+  .coin-wrap.heads{--end:2160deg} .coin-wrap.tails{--end:2340deg}
+  .coin-wrap.land::after{animation:ring .9s ease-out forwards}
+  .coin-wrap.land .coin{filter:drop-shadow(0 0 44px rgba(245,197,66,.6))}
+  @keyframes arc{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.7,.3,1)}42%{transform:translateY(-360px);animation-timing-function:cubic-bezier(.7,0,.9,.4)}80%{transform:translateY(0);animation-timing-function:ease-out}90%{transform:translateY(-48px);animation-timing-function:ease-in}100%{transform:translateY(0)}}
+  @keyframes spin{from{transform:rotateX(0)}to{transform:rotateX(var(--end))}}
+  @keyframes shade{0%,100%{transform:scale(1);opacity:1}42%{transform:scale(.35);opacity:.35}80%{transform:scale(1);opacity:1}90%{transform:scale(.8);opacity:.7}}
+  @keyframes ring{from{transform:scale(.9);opacity:.9}to{transform:scale(1.9);opacity:0}}
+  .toss-result{font:800 40px var(--display);letter-spacing:.3em;color:var(--gold);min-height:1.2em}
+  .toss-line{font:900 78px/1 var(--display);text-align:center;min-height:1.1em;text-transform:uppercase}
+  .toss-line em{font-style:normal;color:var(--red)}
+  .toss-line.dim{color:var(--dim);font-size:40px;letter-spacing:.22em;font-weight:700}
+  .toss-line.pop{animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+  .toss-sub{font:600 28px var(--display);letter-spacing:.22em;color:var(--dim);min-height:1.2em;text-transform:uppercase}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+
+  /* side choice */
+  #side{flex-direction:column;align-items:center;justify-content:center;gap:34px}
+  .side-wrap{display:flex;align-items:stretch;gap:0;width:1560px}
+  .side-panel{--c:255,70,85;position:relative;flex:1;height:430px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;overflow:hidden;
+    background:linear-gradient(160deg,rgba(var(--c),.16),rgba(12,12,16,.95) 65%);border:1px solid rgba(var(--c),.35)}
+  .side-panel.killer{clip-path:polygon(0 0,100% 0,calc(100% - 46px) 100%,0 100%)}
+  .side-panel.survivor{--c:112,232,244;clip-path:polygon(46px 0,100% 0,100% 100%,0 100%);background:linear-gradient(200deg,rgba(var(--c),.15),rgba(12,12,16,.95) 65%)}
+  .side-panel::before{content:"";position:absolute;inset:0;opacity:.5;background:repeating-linear-gradient(115deg,transparent 0 22px,rgba(var(--c),.05) 22px 24px)}
+  .sp-role{position:relative;font:900 104px/1 var(--display);letter-spacing:.1em;color:rgb(var(--c));text-shadow:0 0 40px rgba(var(--c),.4)}
+  .sp-team{position:relative;display:flex;align-items:center;gap:22px;min-height:104px}
+  .sp-team .logo{width:96px;height:96px}
+  .sp-team b{font:900 62px/1 var(--display);text-transform:uppercase;letter-spacing:.02em;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side-vs{position:relative;z-index:2;flex:none;width:0;display:grid;place-items:center}
+  .side-vs span{font:900 56px var(--display);padding:6px 14px;background:var(--bg);border:2px solid var(--red);color:var(--red);letter-spacing:.06em;transform:skewX(-8deg)}
+  .side-panel.pending .sp-team b{color:var(--mute);animation:blink 1.4s ease-in-out infinite}
+  .side-panel.pending .sp-team .logo{opacity:.25}
+  .side-note{font:700 32px var(--display);letter-spacing:.2em;color:var(--dim);text-transform:uppercase;text-align:center}
+  .side-note em{font-style:normal;color:var(--text)}
+  #side.reveal .side-panel.killer{animation:slideL .7s cubic-bezier(.2,1.1,.3,1) both}
+  #side.reveal .side-panel.survivor{animation:slideR .7s cubic-bezier(.2,1.1,.3,1) .12s both}
+  #side.reveal .sp-team{animation:pop .6s cubic-bezier(.2,1.4,.4,1) .55s both}
+  @keyframes slideL{from{transform:translateX(-90px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes slideR{from{transform:translateX(90px);opacity:0}to{transform:none;opacity:1}}
+
+  /* map veto */
+  #veto{flex-direction:column;justify-content:center;gap:26px}
+  .grid{display:grid;gap:24px;grid-template-columns:repeat(var(--cols,5),1fr);align-content:center;--turn:255,42,61}
+  .map-card{position:relative;overflow:hidden;height:470px;background:var(--panel);border:2px solid var(--line);
+    clip-path:polygon(0 0,calc(100% - 26px) 0,100% 26px,100% 100%,26px 100%,0 calc(100% - 26px));
+    transition:border-color .4s,transform .4s,box-shadow .4s}
+  .map-art{position:absolute;inset:0;background-size:cover;background-position:center;transition:filter .6s ease .25s,transform .6s}
+  .map-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25),transparent 30%,rgba(0,0,0,.92) 88%)}
+  .map-card .big-n{position:absolute;right:14px;top:-4px;font:900 150px/1 var(--display);color:rgba(255,255,255,.06);pointer-events:none}
+  .idx{position:absolute;left:18px;top:16px;z-index:3;font:700 18px var(--display);letter-spacing:.22em;color:#fff;background:rgba(0,0,0,.55);padding:3px 11px 2px;border-left:3px solid var(--red)}
+  .mc-foot{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:0 20px 18px;display:grid;gap:6px}
+  .mc-name{font:900 52px/.95 var(--display);letter-spacing:.01em;text-transform:uppercase;text-shadow:0 2px 14px rgba(0,0,0,.8)}
+  .mc-state{font:700 19px var(--display);letter-spacing:.2em;color:var(--dim);text-transform:uppercase}
+  .map-card:not(.banned):not(.final).pick{border-color:rgba(var(--turn),.55);box-shadow:0 0 30px rgba(var(--turn),.18),inset 0 0 40px rgba(var(--turn),.07)}
+  .map-card:not(.banned):not(.final).pick .mc-state{color:rgb(var(--turn))}
+  .map-card.pick:not(.banned):not(.final)::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.07) 50%,transparent 60%);background-size:260% 100%;animation:shine 3.4s linear infinite}
+  @keyframes shine{from{background-position:260% 0}to{background-position:-160% 0}}
+  .map-card.banned{border-color:#3d1219}
+  .map-card.banned .map-art{filter:grayscale(1) brightness(.42)}
+  .map-card.banned .mc-name{color:#8b8b96;text-decoration:line-through;text-decoration-thickness:3px;text-decoration-color:rgba(255,42,61,.8)}
+  .map-card.banned .mc-state{color:#ff7581}
+  .map-card.banned::before,.map-card.banned .slash2{content:"";position:absolute;z-index:4;pointer-events:none;height:8px;width:660px;left:calc(50% - 330px);top:calc(50% - 4px);
+    background:linear-gradient(90deg,transparent,#ff2a3d 9%,#ff2a3d 91%,transparent);box-shadow:0 0 22px 3px rgba(255,42,61,.75)}
+  .map-card.banned::before{transform:rotate(54deg)}
+  .map-card.banned .slash2{transform:rotate(-54deg)}
+  .map-card.just{animation:shake .38s ease .32s}
+  .map-card.just::before{animation:slashA .34s cubic-bezier(.2,.9,.2,1) var(--dl,0s) both}
+  .map-card.just .slash2{animation:slashB .34s cubic-bezier(.2,.9,.2,1) calc(var(--dl,0s) + .17s) both}
+  @keyframes slashA{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+  @keyframes slashB{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+  @keyframes shake{0%,100%{translate:0}25%{translate:-6px 2px}60%{translate:5px -2px}}
+  .map-card.final{border-color:var(--gold);transform:translateY(-8px) scale(1.035);box-shadow:0 0 50px rgba(245,197,66,.4)}
+  .map-card.final .mc-state{color:var(--gold)}
+  .ribbon{position:absolute;right:0;top:22px;z-index:5;display:none;padding:4px 18px 3px 22px;background:var(--gold);color:#241800;font:900 20px var(--display);letter-spacing:.2em;clip-path:polygon(14px 0,100% 0,100% 100%,14px 100%,0 50%)}
+  .map-card.final .ribbon{display:block}
+
+  .log{display:grid;gap:24px;grid-template-columns:repeat(var(--cols,5),1fr)}
+  .slot{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;align-items:center;padding:10px 16px;background:rgba(15,15,20,.85);border:1px solid #24242d;border-left:4px solid #33333d;min-height:70px;transition:border-color .4s}
+  .slot .sn{grid-row:1/3;font:900 38px var(--display);color:#3e3e49}
+  .slot .sw{font:700 17px var(--display);letter-spacing:.18em;color:var(--mute);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .slot .sm{font:800 24px var(--display);letter-spacing:.04em;text-transform:uppercase;color:#4a4a55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .slot.filled{border-left-color:var(--red)} .slot.filled .sn{color:var(--red)} .slot.filled .sw{color:#ff8892} .slot.filled .sm{color:var(--text)}
+  .slot.next{border-left-color:rgba(var(--turn),1);animation:blink 1.4s ease-in-out infinite}
+  .slot.final.filled{border-left-color:var(--gold)} .slot.final.filled .sn{color:var(--gold)} .slot.final.filled .sw{color:var(--gold)}
+  .slot.new{animation:slotIn .6s cubic-bezier(.2,1.2,.3,1)}
+  @keyframes slotIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+  /* done */
+  #done{align-items:center;justify-content:center}
+  .done-card{position:relative;width:1400px;padding:54px 60px 46px;text-align:center;display:grid;gap:18px;justify-items:center;overflow:hidden;
+    border:1px solid rgba(245,197,66,.4);background:linear-gradient(180deg,rgba(24,18,6,.8),rgba(10,10,14,.92));clip-path:polygon(0 0,calc(100% - 40px) 0,100% 40px,100% 100%,40px 100%,0 calc(100% - 40px))}
+  .done-card::before{content:"";position:absolute;inset:0;background:var(--art,none);background-size:cover;background-position:center;opacity:.22;filter:saturate(.7)}
+  .done-card>*{position:relative}
+  .d-kicker{font:700 26px var(--display);letter-spacing:.4em;color:var(--dim);text-transform:uppercase}
+  .d-map{font:900 168px/.9 var(--display);color:var(--gold);text-transform:uppercase;letter-spacing:.01em;text-shadow:0 0 60px rgba(245,197,66,.3);animation:pop .7s cubic-bezier(.2,1.4,.4,1)}
+  .d-vs{font:800 40px var(--display);letter-spacing:.12em;text-transform:uppercase}
+  .d-sides{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+  .d-chip{display:flex;align-items:center;gap:14px;padding:10px 24px 8px;font:800 30px var(--display);letter-spacing:.06em;text-transform:uppercase;border:1px solid}
+  .d-chip small{font:700 20px var(--display);letter-spacing:.24em}
+  .d-chip.killer{border-color:rgba(var(--kill),.7);background:rgba(var(--kill),.12)} .d-chip.killer small{color:#ff7882}
+  .d-chip.survivor{border-color:rgba(var(--surv),.65);background:rgba(var(--surv),.1)} .d-chip.survivor small{color:#7eeaf5}
+  .d-note{font:600 22px var(--display);letter-spacing:.22em;color:var(--mute);text-transform:uppercase}
+
+  /* footer */
+  .foot{display:flex;justify-content:space-between;align-items:center;color:var(--mute);font:700 17px var(--display);letter-spacing:.22em;text-transform:uppercase;padding-top:6px;border-top:1px solid #1b1b22}
+  .chip{display:inline-flex;align-items:center;gap:10px}
+  .dot{width:11px;height:11px;border-radius:50%;background:#55555f}
+  .chip.live .dot{background:var(--ok);box-shadow:0 0 10px var(--ok);animation:blink 2s infinite}
+  .chip.warn .dot{background:var(--gold)} .chip.off .dot{background:var(--red);animation:blink 1s infinite}
+  .chip.live{color:#9fe9c6} .chip.warn{color:#e6c46a} .chip.off{color:#ff8892}
+  #clock{margin-left:14px;color:var(--mute)}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
-<div class="stage">
-  <div class="head">
-    <div class="team a" id="ta">Team A</div>
-    <div class="mid"><span id="phase">Waiting for match</span><strong id="turn"></strong></div>
-    <div class="team b" id="tb">Team B</div>
-  </div>
+<div class="canvas" id="canvas">
+  <div class="bg"></div><div class="grain"></div><div class="vignette"></div>
 
-  <div class="body">
-    <section class="scene on" id="idle"><div class="toss-line" style="margin:auto;color:var(--dim)">Waiting for the match ceremony to start…</div></section>
+  <header class="top">
+    <div class="pw a" id="pw-a"><div class="plate">
+      <div class="logo" id="logo-a"><i>A</i></div>
+      <div class="tinfo"><span class="role" id="role-a"></span><div class="tname" id="ta">Team A</div><div class="ttag" id="tag-a"></div></div>
+    </div></div>
+    <div class="center"><div class="kicker" id="kicker">The VNC Trials</div><div class="phase" id="phase">Standing by</div><div class="turnline" id="turn"></div></div>
+    <div class="pw b" id="pw-b"><div class="plate">
+      <div class="logo" id="logo-b"><i>B</i></div>
+      <div class="tinfo"><span class="role" id="role-b"></span><div class="tname" id="tb">Team B</div><div class="ttag" id="tag-b"></div></div>
+    </div></div>
+  </header>
+
+  <nav class="steps" id="steps" aria-label="Ceremony progress">
+    <div class="step" data-i="0"><b>01</b>COIN TOSS</div>
+    <div class="step" data-i="1"><b>02</b>CHOOSE SIDE</div>
+    <div class="step" data-i="2"><b>03</b>MAP VETO</div>
+    <div class="step" data-i="3"><b>04</b>REALM LOCKED</div>
+  </nav>
+
+  <main class="body">
+    <section class="scene on" id="idle"><div class="idle-mark">THE VNC TRIALS</div><div class="ready-line">Waiting for the match ceremony</div></section>
+
+    <section class="scene" id="ready"><div class="ready-vs">VS</div><div class="ready-line" id="ready-line">Coin toss incoming</div></section>
+
     <section class="scene" id="toss">
       <div class="coin-wrap" id="coinwrap"><div class="coin" id="coin"></div><div class="coin-shadow"></div></div>
       <div class="toss-result" id="tossresult"></div>
       <div class="toss-line" id="tossline"></div>
+      <div class="toss-sub" id="tosssub"></div>
     </section>
-    <section class="scene" id="veto"><div class="grid" id="grid"></div></section>
-    <section class="scene" id="done">
-      <div class="label">The realm has been decided</div>
-      <div class="big" id="finalmap"></div>
-      <div class="vs" id="finalvs"></div>
-    </section>
-  </div>
 
-  <div class="foot"><span><span class="dot" id="dot"></span><span id="conn">Not connected</span></span><span>The Entity Championship</span></div>
+    <section class="scene" id="side">
+      <div class="side-wrap">
+        <div class="side-panel killer pending" id="sp-k"><div class="sp-role">KILLER</div><div class="sp-team"><div class="logo" id="sp-k-logo"><i>?</i></div><b id="sp-k-name">— — —</b></div></div>
+        <div class="side-vs"><span>VS</span></div>
+        <div class="side-panel survivor pending" id="sp-s"><div class="sp-role">SURVIVOR</div><div class="sp-team"><div class="logo" id="sp-s-logo"><i>?</i></div><b id="sp-s-name">— — —</b></div></div>
+      </div>
+      <div class="side-note" id="side-note"></div>
+    </section>
+
+    <section class="scene" id="veto">
+      <div class="grid" id="grid"></div>
+      <div class="log" id="log"></div>
+    </section>
+
+    <section class="scene" id="done">
+      <div class="done-card" id="done-card">
+        <div class="d-kicker">The realm has been decided</div>
+        <div class="d-map" id="finalmap"></div>
+        <div class="d-vs" id="finalvs"></div>
+        <div class="d-sides" id="finalsides"></div>
+        <div class="d-note" id="finalnote"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="chip warn" id="chip"><span class="dot"></span><span id="conn">Connecting…</span><span id="clock"></span></span>
+    <span>The VNC Trials · Dead by Daylight</span>
+  </footer>
 </div>
 
 <script>
+(() => {
+'use strict';
 const STATE_KEY = 'entity-championship-state-v1';
 const CHANNEL   = 'entity-championship-sync-v1';
+const params = new URLSearchParams(location.search);
+const DEMO = params.get('demo');
+const PIN  = params.get('match');
 
-/* Turns the controller's saved tournament state into what this scene needs. Never throws. */
+/* ---------- team look-up (logo + accent), same list as the leaderboard ---------- */
+const LOGO_DIRS = ['/Images/', '../Images/', 'Images/', '/images/', '../images/', 'images/'];
+const TEAMS = {
+  boys:{file:'Boys.png',acc:'245,197,24'}, hakle:{file:'Hakle.png',acc:'255,59,59'}, nicesu:{file:'Nicesu.png',acc:'255,162,26'},
+  onyx:{file:'Onyx.png',acc:'166,120,255'}, vibes:{file:'Vibes.png',acc:'255,63,180'}, vrty:{file:'Vrty.png',acc:'61,242,192'}, yo:{file:'Yo.png',acc:'255,122,46'}
+};
+const DEFAULT_ACC = '255,42,61';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hue = (n) => { let h = 0; for (const c of String(n)) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(135deg,hsl(${h} 45% 24%),hsl(${(h + 50) % 360} 55% 11%))`; };
+const findTeam = (name) => { for (const t of String(name || '').toLowerCase().split(/[^a-z0-9]+/)) if (t && TEAMS[t]) return TEAMS[t]; return null; };
+const accOf = (name) => (findTeam(name) || {}).acc || DEFAULT_ACC;
+
+const logoCache = new Map(); let goodDir = null;
+const variants = (f) => { const b = f.replace(/\.\w+$/, ''); return [...new Set([f, b[0].toUpperCase() + b.slice(1).toLowerCase() + '.png', b.toLowerCase() + '.png', b.toUpperCase() + '.png'])]; };
+const probe = (u) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(true); i.onerror = () => ok(false); i.src = u; });
+function resolveLogo(team) {
+  if (!logoCache.has(team.file)) logoCache.set(team.file, (async () => {
+    for (const d of [goodDir, ...LOGO_DIRS].filter((x, i, a) => x && a.indexOf(x) === i))
+      for (const n of variants(team.file)) { const u = encodeURI(d + n); if (await probe(u)) { goodDir = d; return u; } }
+    return null;
+  })());
+  return logoCache.get(team.file);
+}
+function setLogo(el, name, fallback) {
+  if (!el || el.dataset.for === String(name)) return;
+  el.dataset.for = String(name);
+  const initials = esc(String(name || fallback || '?').trim().slice(0, 2).toUpperCase());
+  el.innerHTML = `<i>${initials}</i>`;
+  const team = findTeam(name);
+  if (team) resolveLogo(team).then((u) => { if (u && el.dataset.for === String(name)) el.innerHTML = `<img alt="" src="${u}">`; });
+}
+
+/* ---------- state → view model (pure, never throws) ---------- */
+function pickMatch(r) {
+  if (PIN) { const m = r.matches.find((x) => x.id === PIN); if (m && m.teamAId && m.teamBId) return m; }
+  if (window.Entity && Entity.activeMatch) return Entity.activeMatch(r);   // same rule as every other screen
+  const ok = (m) => m.teamAId && m.teamBId && m.status !== 'bye';
+  return r.matches.find((m) => m.status === 'in_progress' && ok(m)) || r.matches.find((m) => m.id === r.activeMatchId && ok(m) && m.status !== 'completed') ||
+         r.matches.find((m) => m.status === 'pending' && ok(m)) || null;
+}
 function normalize(r) {
   if (!r || !Array.isArray(r.matches)) return null;
-  const teams = r.teams || [];
-  const match = (window.Entity && Entity.activeMatch(r)) || r.matches.find(m => m.id === r.activeMatchId) || r.matches.find(m => m.status === 'in_progress') || r.matches.find(m => m.status === 'pending') || r.matches[0];
-  if (!match) return null;
-  const toss = match.toss || {}, veto = match.mapVeto || {};
-  const teamN = id => teams.find(t => t.id === id)?.name || 'TBD';
-  const A = match.teamAId, B = match.teamBId;
-  const bans = (Array.isArray(veto.bans) ? veto.bans : []).map(b => typeof b === 'string' ? { map:b, teamId:null } : { map: b.map?.id ?? b.map?.name ?? b.map ?? b.id, teamId: b.teamId });
+  const match = pickMatch(r); if (!match) return null;
+  const teams = r.teams || [], nameOf = (id) => (teams.find((t) => t.id === id) || {}).name || 'TBD';
+  const A = match.teamAId, B = match.teamBId, toss = match.toss || {}, veto = match.mapVeto || {};
+  const mid = (x) => (x == null ? null : typeof x === 'string' ? x : (x.id ?? x.name ?? null));
+  const pool = (veto.pool || []).map((m) => (typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img }));
+  const bans = (Array.isArray(veto.bans) ? veto.bans : []).map((b) => (typeof b === 'string' ? { map:b, teamId:null } : { map: mid(b.map) ?? b.id, teamId: b.teamId || null }));
+  const finalMap = mid(veto.finalMap);
   const first = toss.winnerId || null, second = first === A ? B : A;
-  const finalMap = veto.finalMap?.id ?? veto.finalMap?.name ?? veto.finalMap ?? null;
+  const hasToss = Boolean(toss.winnerId || toss.side);
+  const mr = match.roles; let roles = null;
+  if (mr && (mr.game1KillerId === A || mr.game1KillerId === B)) roles = { killerId: mr.game1KillerId, survivorId: mr.game1KillerId === A ? B : A };
+  else if (bans.length || finalMap) roles = { killerId: A, survivorId: B };           // older matches: legacy rule (Team A = Killer, Game 1)
+  const sidePending = Boolean(hasToss && first && !roles && !finalMap);
+  const turn = hasToss && first && roles && !finalMap ? (bans.length % 2 === 0 ? first : second) : null;
+  const ts = (v) => (v ? Date.parse(v) || 0 : 0);
   return {
-    teamAId: A, teamBId: B, teamAName: teamN(A), teamBName: teamN(B),
-    coin: toss.side || null,
-    tossWinnerId: first,
-    pool: (veto.pool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img }),
-    bans, finalMap,
-    sides: (match.roles && window.Entity && Entity.rolesFor) ? (() => { const g = Entity.rolesFor(match, 1); return `${teamN(g.killerId)} KILLER · ${teamN(g.survivorId)} SURVIVOR`; })() : '',
-    sidePending: Boolean(first && !match.roles && !finalMap),
-    turn: first && !finalMap && match.roles ? (bans.length % 2 === 0 ? first : second) : null,
-    // stable per match + result: a re-save of the same toss must NOT replay the coin flip
-    tossKey: `${match.id}:${toss.side || ''}:${first || ''}`
+    matchId: match.id, roundName: match.roundName || '', matchNumber: match.matchNumber || null,
+    teamAId: A, teamBId: B, teamAName: nameOf(A), teamBName: nameOf(B),
+    coin: toss.side || null, calledSide: toss.calledSide || null, callerId: toss.callerId || null, tossWinnerId: first, hasToss, tossAt: ts(toss.savedAt),
+    tossKey: `${match.id}|${toss.side || ''}|${first || ''}|${toss.savedAt || ''}`,
+    pool, bans, finalMap, roles, sidePending, turn,
+    choice: mr && mr.chooserId ? { teamId: mr.chooserId, role: mr.choice } : null,
+    rolesKey: mr && mr.game1KillerId ? `${match.id}|${mr.game1KillerId}|${mr.savedAt || ''}` : null, rolesAt: ts(mr && mr.savedAt),
+    nameOf
   };
 }
-async function loadRemote() { return null; }
+const nameIn = (n, id) => (id === n.teamAId ? n.teamAName : id === n.teamBId ? n.teamBName : 'TBD');
 
-const $ = id => document.getElementById(id);
-const scenes = ['idle','toss','veto','done'];
-let prev = { bans:new Set(), coinShown:null, scene:'idle' };
-let current = null, lastNorm = null, tossBusy = false;
+/* ---------- scene director ----------
+   Rule: the screen always converges on the saved state. Animated "ceremonies" (coin toss, side reveal)
+   only play when this screen actually watched the change happen, or the change is only seconds old —
+   so reloading an OBS source never replays old animations, and nothing can leave the screen stuck. */
+const S = { cur:null, key:null, matchId:null, tossKey:null, rolesKey:null, sawNoToss:false, sawSidePending:false,
+            bans:new Set(), vetoShown:false, scene:null, busy:null, timers:[], lastRead:0 };
+const later = (fn, ms) => { const t = setTimeout(() => { S.timers = S.timers.filter((x) => x !== t); fn(); }, ms); S.timers.push(t); };
+function cancelCeremony() { S.timers.forEach(clearTimeout); S.timers = []; S.busy = null; }
+function resetMatch(id) { S.matchId = id; S.tossKey = null; S.rolesKey = null; S.sawNoToss = false; S.sawSidePending = false; S.bans = new Set(); S.vetoShown = false; $('grid').dataset.sig = ''; $('log').dataset.sig = ''; }
 
-function show(name) { scenes.forEach(s => $(s).classList.toggle('on', s === name)); prev.scene = name; }
-const teamName = (st, tId) => tId === st.teamAId ? st.teamAName : (tId === st.teamBId ? st.teamBName : 'TBD');
-
-function render(st) {
-  if (!st || (!st.pool.length && !st.coin && !st.tossWinnerId)) { if (!tossBusy) show('idle'); return; }
-  $('ta').textContent = st.teamAName; $('tb').textContent = st.teamBName;
-  const isA = t => t === st.teamAId, isB = t => t === st.teamBId;
-  $('ta').classList.toggle('turn', isA(st.turn)); $('tb').classList.toggle('turn', isB(st.turn));
-  $('ta').classList.toggle('dim', !!st.turn && !isA(st.turn)); $('tb').classList.toggle('dim', !!st.turn && !isB(st.turn));
-
-  if (tossBusy) return;                         // let the flip finish; render(current) runs afterwards
-
-  if (st.finalMap) {
-    const m = st.pool.find(p => p.id === st.finalMap) || { name: st.finalMap };
-    $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamAName}  vs  ${st.teamBName}`;
-    $('phase').textContent = 'Map locked'; $('turn').textContent = st.sides || '';
-    show('done'); syncBans(st, true); return;
-  }
-  if (!st.bans.length && st.coin && st.tossWinnerId && prev.coinShown !== st.tossKey) { runToss(st); return; }
-  if (!st.pool.length) { show('idle'); return; }
-
-  if (st.sidePending) { $('phase').textContent = 'Side choice'; $('turn').textContent = `${teamName(st, st.tossWinnerId)} choosing Killer or Survivor`; }
-  else { $('phase').textContent = st.sides ? `Map veto · ${st.sides}` : 'Map veto'; $('turn').textContent = st.turn ? `${teamName(st, st.turn)} to ban` : ''; }
-  show('veto'); syncBans(st);
+function ingest(raw) {
+  try {
+    S.lastRead = Date.now();
+    const n = normalize(raw), k = JSON.stringify(n, (key, v) => (key === 'nameOf' ? undefined : v));
+    if (k === S.key) return;                 // nothing we display changed
+    S.key = k; S.cur = n; update();
+  } catch (err) { console.error('toss-screen render failed', err); }
 }
 
+function update() {
+  const n = S.cur;
+  if (!n) { cancelCeremony(); resetMatch(null); header(null); phase('Standing by', ''); setScene('idle'); return; }
+  if (n.matchId !== S.matchId) { cancelCeremony(); resetMatch(n.matchId); }
+  header(n);
+  if (S.busy) return;                        // a ceremony is playing; update() runs again when it ends
+
+  const fresh = (t) => t && Math.abs(Date.now() - t) < 20000;
+  if (!n.hasToss) { S.sawNoToss = true; S.tossKey = null; S.rolesKey = null; S.sawSidePending = false; }
+  else if (S.tossKey !== n.tossKey) {
+    const watched = S.sawNoToss; S.tossKey = n.tossKey;
+    if ((watched || fresh(n.tossAt)) && !n.bans.length && !n.finalMap) return playToss(n);
+  }
+  if (n.sidePending) S.sawSidePending = true;
+  if (!n.rolesKey) S.rolesKey = null;
+  else if (S.rolesKey !== n.rolesKey) {
+    const watched = S.sawSidePending; S.rolesKey = n.rolesKey;
+    if ((watched || fresh(n.rolesAt)) && !n.bans.length && !n.finalMap) return playSide(n);
+  }
+  settle(n);
+}
+
+function settle(n) {
+  if (!n.hasToss) {
+    $('ready-line').innerHTML = `<em>${esc(n.teamAName)}</em> &nbsp;vs&nbsp; <em>${esc(n.teamBName)}</em> — coin toss incoming`;
+    phase('Awaiting toss', ''); setScene('ready'); return;
+  }
+  if (n.finalMap) { renderDone(n); phase('Realm locked', ''); setScene('done'); return; }
+  if (n.sidePending) {
+    fillSide(n, true);
+    phase('Side choice', `<em>${esc(nameIn(n, n.tossWinnerId))}</em> is choosing`); setScene('side'); return;
+  }
+  renderVeto(n);
+  const total = Math.max(n.pool.length - 1, 1);
+  phase('Map veto', n.turn ? `Ban ${Math.min(n.bans.length + 1, total)} of ${total} · <em>${esc(nameIn(n, n.turn))}</em> to ban` : '');
+  setScene('veto');
+}
+
+function setScene(name) {
+  header(S.cur);
+  if (S.scene === name) return;
+  S.scene = name;
+  ['idle', 'ready', 'toss', 'side', 'veto', 'done'].forEach((s) => $(s).classList.toggle('on', s === name));
+}
+function phase(text, turnHtml) { $('phase').textContent = text; $('turn').innerHTML = turnHtml || ''; }
+
+/* ---------- header (team plates, roles, tags, progress rail) ---------- */
+function header(n) {
+  const maskToss = S.busy === 'toss', maskRoles = S.busy === 'toss' || S.busy === 'side';
+  const plate = (side, id, name) => {
+    const pw = $('pw-' + side), isTurn = n && n.turn === id && !maskToss && !maskRoles;
+    pw.style.setProperty('--acc', accOf(name));
+    pw.classList.toggle('turn', Boolean(isTurn));
+    pw.classList.toggle('dim', Boolean(n && n.turn && !maskToss && !maskRoles && n.turn !== id));
+    const t = $('t' + side); t.textContent = name; t.classList.toggle('long', String(name).length > 12);
+    setLogo($('logo-' + side), name, side.toUpperCase());
+    const role = $('role-' + side); let r = '';
+    if (n && n.roles && !maskRoles) r = n.roles.killerId === id ? 'killer' : n.roles.survivorId === id ? 'survivor' : '';
+    role.className = 'role' + (r ? ' ' + r : ''); role.textContent = r.toUpperCase();
+    const tag = $('tag-' + side); let txt = '', cls = 'ttag';
+    if (isTurn) { txt = 'Banning now'; cls += ' hot'; }
+    else if (n && n.hasToss && n.tossWinnerId === id && !maskToss) { txt = 'Won the toss · bans first'; cls += ' toss'; }
+    tag.textContent = txt; tag.className = cls;
+  };
+  if (!n) {
+    plate('a', null, 'Team A'); plate('b', null, 'Team B');
+    $('kicker').textContent = 'The VNC Trials';
+    document.querySelectorAll('.step').forEach((s) => s.className = 'step'); return;
+  }
+  plate('a', n.teamAId, n.teamAName); plate('b', n.teamBId, n.teamBName);
+  $('kicker').textContent = [n.roundName, n.matchNumber ? 'Match ' + n.matchNumber : ''].filter(Boolean).join(' · ') || 'The VNC Trials';
+  let idx = 0;
+  if (n.hasToss && S.busy !== 'toss') idx = S.busy === 'side' ? 1 : n.finalMap ? 3 : n.sidePending ? 1 : 2;
+  document.querySelectorAll('.step').forEach((s) => {
+    const i = Number(s.dataset.i);
+    s.className = 'step' + (i < idx ? ' done' : i === idx ? ' on' + (idx === 3 ? ' gold' : '') : '');
+  });
+}
+
+/* ---------- coin toss ceremony ---------- */
 function buildCoin() {
   const c = $('coin'); if (c.dataset.built) return; c.dataset.built = 1;
   let h = ''; for (let z = -6; z <= 6; z += 2) h += `<s style="transform:translateZ(${z}px)"></s>`;
   c.innerHTML = h + '<i class="front">HEADS</i><i class="back">TAILS</i>';
 }
-function runToss(st) {
-  tossBusy = true; prev.coinShown = st.tossKey;
-  show('toss'); $('phase').textContent = 'Coin toss'; $('turn').textContent = '';
-  buildCoin();
-  const wrap = $('coinwrap'), line = $('tossline'), res = $('tossresult');
-  const tails = String(st.coin).toLowerCase() === 'tails';
-  wrap.className = 'coin-wrap'; res.textContent = '';
-  line.className = 'toss-line dim'; line.textContent = 'FLIPPING…'; void wrap.offsetWidth;
-  wrap.classList.add(tails ? 'tails' : 'heads', 'throw');
-  setTimeout(() => { wrap.classList.add('land'); res.textContent = tails ? 'TAILS' : 'HEADS'; }, 2600);
-  setTimeout(() => { line.className = 'toss-line pop'; line.innerHTML = `<em>${esc(teamName(st, st.tossWinnerId))}</em> wins the toss — bans first`; }, 3200);
-  setTimeout(() => { tossBusy = false; render(current); }, 6000);
+function playToss(n) {
+  S.busy = 'toss'; header(n); buildCoin(); phase('Coin toss', ''); setScene('toss');
+  const wrap = $('coinwrap'), line = $('tossline'), res = $('tossresult'), sub = $('tosssub');
+  const tails = String(n.coin).toLowerCase() === 'tails';
+  wrap.className = 'coin-wrap'; res.textContent = ''; sub.textContent = ''; void wrap.offsetWidth;
+  const caller = n.callerId ? nameIn(n, n.callerId) : '';
+  line.className = 'toss-line dim';
+  line.textContent = caller ? `${caller} calls ${String(n.calledSide || '').toUpperCase()}` : 'Flipping…';
+  later(() => { line.textContent = 'Flipping…'; wrap.classList.add(tails ? 'tails' : 'heads', 'throw'); }, 900);
+  later(() => { wrap.classList.add('land'); res.textContent = tails ? 'TAILS' : 'HEADS'; }, 3500);
+  later(() => { line.className = 'toss-line pop'; line.innerHTML = `<em>${esc(nameIn(n, n.tossWinnerId))}</em> wins the toss`; sub.textContent = 'Chooses their side · bans first'; }, 4100);
+  later(() => { S.busy = null; update(); }, 7000);
 }
 
-function syncBans(st, quiet) {
-  const grid = $('grid');
-  const cols = st.pool.length <= 4 ? st.pool.length : st.pool.length <= 8 ? 4 : 5;
-  grid.style.setProperty('--cols', Math.max(cols, 1));
-  const sig = st.pool.map(p => p.id).sort().join('|');   // order-independent: a reshuffled pool is not a new pool
+/* ---------- side choice ---------- */
+function fillSide(n, pending) {
+  const kName = pending || !n.roles ? '— — —' : nameIn(n, n.roles.killerId);
+  const sName = pending || !n.roles ? '— — —' : nameIn(n, n.roles.survivorId);
+  $('sp-k').classList.toggle('pending', pending); $('sp-s').classList.toggle('pending', pending);
+  $('sp-k-name').textContent = kName; $('sp-s-name').textContent = sName;
+  if (pending) { $('sp-k-logo').dataset.for = ''; $('sp-s-logo').dataset.for = ''; $('sp-k-logo').innerHTML = '<i>?</i>'; $('sp-s-logo').innerHTML = '<i>?</i>'; }
+  else { setLogo($('sp-k-logo'), kName); setLogo($('sp-s-logo'), sName); }
+  const winner = nameIn(n, n.tossWinnerId);
+  $('side-note').innerHTML = pending
+    ? `<em>${esc(winner)}</em> won the toss — choosing a side`
+    : `<em>${esc(n.choice ? nameIn(n, n.choice.teamId) : winner)}</em> chose <em>${esc(String((n.choice && n.choice.role) || (n.roles && n.roles.killerId === n.tossWinnerId ? 'killer' : 'survivor')).toUpperCase())}</em> · sides swap in game 2`;
+}
+function playSide(n) {
+  S.busy = 'side'; header(n); phase('Side choice', `<em>${esc(nameIn(n, n.tossWinnerId))}</em> has chosen`); setScene('side');
+  $('side').classList.remove('reveal'); fillSide(n, true);
+  later(() => { fillSide(n, false); $('side').classList.add('reveal'); }, 1100);
+  later(() => { $('side').classList.remove('reveal'); S.busy = null; update(); }, 5200);
+}
+
+/* ---------- map veto ---------- */
+function renderVeto(n) {
+  const grid = $('grid'), log = $('log');
+  const cols = Math.max(Math.min(n.pool.length, 6), 1);
+  grid.style.setProperty('--cols', cols); log.style.setProperty('--cols', cols);
+  grid.style.setProperty('--turn', n.turn ? accOf(nameIn(n, n.turn)) : DEFAULT_ACC); log.style.setProperty('--turn', grid.style.getPropertyValue('--turn'));
+  const sig = n.matchId + '|' + n.pool.map((p) => p.id).join('|');
   let rebuilt = false;
   if (grid.dataset.sig !== sig) {
     grid.dataset.sig = sig; rebuilt = true;
-    grid.innerHTML = st.pool.map(p => `<div class="map-card" data-id="${esc(p.id)}">
+    grid.innerHTML = n.pool.map((p, i) => `<div class="map-card" data-id="${esc(p.id)}">
       <div class="map-art" style="${p.image ? `background-image:url('${esc(p.image)}')` : `background:${hue(p.name)}`}"></div>
-      <span class="by"></span><span class="name">${esc(p.name)}</span></div>`).join('');
+      <span class="big-n">${String(i + 1).padStart(2, '0')}</span><span class="idx">REALM ${String(i + 1).padStart(2, '0')}</span><span class="ribbon">SELECTED</span>
+      <span class="slash2"></span>
+      <div class="mc-foot"><span class="mc-name">${esc(p.name)}</span><span class="mc-state"></span></div></div>`).join('');
   }
-  const banned = new Map(st.bans.map(b => [b.map, b.teamId]));
-  grid.querySelectorAll('.map-card').forEach(el => {
-    const id = el.dataset.id, isBanned = banned.has(id), wasBanned = prev.bans.has(id);
+  const banned = new Map(n.bans.map((b) => [b.map, b.teamId]));
+  const fresh = n.bans.filter((b) => !S.bans.has(b.map)).map((b) => b.map);
+  const animate = S.vetoShown && !rebuilt;
+  grid.querySelectorAll('.map-card').forEach((el) => {
+    const id = el.dataset.id, isBanned = banned.has(id), st = el.querySelector('.mc-state');
     el.classList.toggle('banned', isBanned);
-    el.classList.toggle('final', id === st.finalMap);
-    el.classList.remove('just-banned');
-    if (isBanned) el.querySelector('.by').textContent = 'BANNED · ' + teamName(st, banned.get(id));
-    if (isBanned && !wasBanned && !quiet && !rebuilt) { void el.offsetWidth; el.classList.add('just-banned'); }  // animate only genuinely new bans
+    el.classList.toggle('final', id === n.finalMap);
+    el.classList.toggle('pick', !isBanned && !n.finalMap && Boolean(n.turn));
+    el.classList.remove('just'); el.style.removeProperty('--dl');
+    st.textContent = isBanned ? 'Banned · ' + nameIn(n, banned.get(id)) : id === n.finalMap ? 'Selected map' : n.turn ? 'Available' : '';
+    const k = fresh.indexOf(id);
+    if (animate && k >= 0) { void el.offsetWidth; el.style.setProperty('--dl', (k * 0.45) + 's'); el.classList.add('just'); setTimeout(() => el.classList.remove('just'), 2800 + k * 450); }
   });
-  prev.bans = new Set(banned.keys());
-}
-
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const hue = n => { let h = 0; for (const c of String(n)) h = (h * 31 + c.charCodeAt(0)) % 360; return `linear-gradient(135deg,hsl(${h} 45% 22%),hsl(${(h+50)%360} 55% 12%))`; };
-
-/* ---------- data wiring ---------- */
-function ingest(raw) {
-  try {
-    const n = normalize(raw), k = JSON.stringify(n);
-    if (k === lastNorm) return;                 // ignore saves that changed nothing we display (timestamps, heartbeats…)
-    lastNorm = k; current = n; render(n);
-  } catch (err) { console.error('toss-screen render failed', err); }
-}
-function readLocal() { try { if (window.Entity) return Entity.load(); return JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } }
-function setConn(ok, txt) { $('dot').classList.toggle('live', ok); $('conn').textContent = txt; }
-
-const params = new URLSearchParams(location.search);
-if (params.get('bg') === 'transparent') document.body.classList.add('transparent');
-
-if (params.get('demo')) {
-  setConn(true, 'Demo mode');
-  const names = ['Ashfall','Citadel','Dunemark','Emberhold','Frostgate','Gloam','Hollow Keep'];
-  const raw = { activeMatchId:'m1', teams:[{id:'t1',name:'Crimson Wolves'},{id:'t2',name:'Night Owls'}],
-    matches:[{ id:'m1', teamAId:'t1', teamBId:'t2', status:'in_progress', toss:{}, mapVeto:{ pool:[], bans:[], finalMap:null } }] };
-  const m = raw.matches[0], wait = ms => new Promise(r => setTimeout(r, ms));
-  (async () => {
-    ingest(raw); await wait(1200);
-    m.toss = { side:'heads', winnerId:'t1' }; m.mapVeto.pool = names; ingest(raw); await wait(5600);
-    for (let i = 0; i < 6; i++) {
-      const left = names.filter(n => !m.mapVeto.bans.some(b => b.map === n));
-      m.mapVeto.bans.push({ map:left[Math.floor(Math.random()*left.length)], teamId: i % 2 ? 't2' : 't1' });
-      ingest(raw); await wait(2200);
+  // ban order strip, one slot per ban + the final map
+  const slots = Math.max(cols - 1, n.bans.length, 1), lsig = sig + '|' + n.bans.map((b) => b.map + b.teamId).join(',') + '|' + (n.finalMap || '');
+  if (log.dataset.sig !== lsig) {
+    const prevCount = Number(log.dataset.count || 0); log.dataset.sig = lsig; log.dataset.count = n.bans.length;
+    const items = [];
+    for (let i = 0; i < slots; i++) {
+      const b = n.bans[i], isNext = !b && i === n.bans.length && !n.finalMap, isNew = b && animate && i >= prevCount;
+      items.push(`<div class="slot ${b ? 'filled' : ''} ${isNext ? 'next' : ''} ${isNew ? 'new' : ''}"><span class="sn">${String(i + 1).padStart(2, '0')}</span>
+        <span class="sw">${b ? 'Ban · ' + esc(nameIn(n, b.teamId)) : isNext ? 'Up next' : 'Ban ' + (i + 1)}</span><span class="sm">${b ? esc(b.map) : '—'}</span></div>`);
     }
-    m.mapVeto.finalMap = names.find(n => !m.mapVeto.bans.some(b => b.map === n)); ingest(raw);
-  })();
-} else {
-  const sync = () => { const raw = readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); };
-  sync();
-  window.addEventListener('storage', e => { if (e.key === STATE_KEY || e.key === null) sync(); });
-  window.addEventListener('entity-state-change', sync); window.addEventListener('load', sync);
-  // the controller's broadcast payload may be a ping, not the state — always re-read the saved state
-  try { new BroadcastChannel(CHANNEL).onmessage = e => { const d = e.data; d && d.matches ? ingest(d) : sync(); }; } catch {}
-  setInterval(async () => { const raw = (await loadRemote()) || readLocal(); ingest(raw); setConn(!!raw, raw ? 'Live' : 'Waiting for controller'); }, 1000);
+    const fm = n.finalMap ? (n.pool.find((p) => p.id === n.finalMap) || { name: n.finalMap }).name : null;
+    items.push(`<div class="slot final ${fm ? 'filled' : ''}"><span class="sn">★</span><span class="sw">Final map</span><span class="sm">${fm ? esc(fm) : '—'}</span></div>`);
+    log.style.setProperty('--cols', slots + 1); log.innerHTML = items.join('');
+  }
+  S.bans = new Set(n.bans.map((b) => b.map)); S.vetoShown = true;
 }
+
+/* ---------- final map ---------- */
+function renderDone(n) {
+  const m = n.pool.find((p) => p.id === n.finalMap) || { name: n.finalMap };
+  $('finalmap').textContent = m.name; $('finalmap').style.fontSize = String(m.name).length > 14 ? '112px' : '';
+  $('done-card').style.setProperty('--art', m.image ? `url('${esc(m.image)}')` : hue(m.name));
+  $('finalvs').textContent = `${n.teamAName}  vs  ${n.teamBName}`;
+  $('finalsides').innerHTML = n.roles
+    ? `<div class="d-chip killer"><small>KILLER</small>${esc(nameIn(n, n.roles.killerId))}</div><div class="d-chip survivor"><small>SURVIVOR</small>${esc(nameIn(n, n.roles.survivorId))}</div>` : '';
+  $('finalnote').textContent = n.roles ? 'Game 1 sides · swap in game 2' : '';
+  S.bans = new Set(n.bans.map((b) => b.map)); S.vetoShown = true;
+}
+
+/* ---------- connection chip ---------- */
+function connUpdate() {
+  let cls = 'warn', txt = 'Waiting for controller';
+  const E = window.Entity;
+  if (DEMO) { cls = 'live'; txt = 'Demo mode'; }
+  else if (!E) { cls = 'warn'; txt = 'Local only · shared.js not loaded'; }
+  else if (E.cloud && E.cloud.configured && E.cloud.configured()) {
+    const s = String(E.cloud.status || '');
+    if (/error|fail/i.test(s)) { cls = 'off'; txt = s; }
+    else if (/connected|saved|live/i.test(s)) { cls = 'live'; txt = 'Live · synced'; }
+    else { cls = 'warn'; txt = s || 'Connecting…'; }
+  } else { cls = 'live'; txt = 'Local mode'; }
+  $('chip').className = 'chip ' + cls; $('conn').textContent = txt;
+  $('clock').textContent = S.lastRead ? new Date(S.lastRead).toLocaleTimeString([], { hour12:false }) : '';
+}
+
+/* ---------- boot ---------- */
+function fit() { $('canvas').style.setProperty('--s', Math.min(innerWidth / 1920, innerHeight / 1080)); }
+const readLocal = () => { try { return window.Entity ? Entity.load() : JSON.parse(localStorage.getItem(STATE_KEY)); } catch { return null; } };
+
+function runDemo() {
+  const maps = ['Ormond Lake Mine', 'Grim Pantry', 'The Pale Rose', 'Coldwind Farm', 'Haddonfield'];
+  const raw = { activeMatchId:'m1', teams:[{ id:'t1', name:'Vibes' }, { id:'t2', name:'Onyx' }],
+    matches:[{ id:'m1', roundName:'QUARTERFINAL', matchNumber:1, teamAId:'t1', teamBId:'t2', status:'in_progress', toss:null, roles:null, mapVeto:null }] };
+  const m = raw.matches[0], wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  (async () => {
+    for (;;) {
+      m.toss = null; m.roles = null; m.mapVeto = null; ingest(raw); await wait(2500);
+      m.toss = { side:'Heads', winnerId:'t2', callerId:'t1', calledSide:'Tails', savedAt:new Date().toISOString() };
+      m.mapVeto = { pool:maps, bans:[], finalMap:null }; ingest(raw); await wait(8500);
+      m.roles = { chooserId:'t2', choice:'killer', game1KillerId:'t2', game1SurvivorId:'t1', savedAt:new Date().toISOString() }; ingest(raw); await wait(6800);
+      for (let i = 0; i < 4; i++) {
+        const left = maps.filter((x) => !m.mapVeto.bans.some((b) => b.map === x));
+        m.mapVeto.bans.push({ map:left[Math.floor(Math.random() * left.length)], teamId: i % 2 ? 't1' : 't2' }); ingest(raw); await wait(2600);
+      }
+      m.mapVeto.finalMap = maps.find((x) => !m.mapVeto.bans.some((b) => b.map === x)); ingest(raw); await wait(9000);
+    }
+  })();
+}
+
+function boot() {
+  fit(); window.addEventListener('resize', fit);
+  if (params.get('bg') === 'transparent') document.body.classList.add('transparent');
+  setInterval(connUpdate, 1000); connUpdate();
+  if (DEMO) { runDemo(); return; }
+  const pull = () => ingest(readLocal());
+  if (window.Entity && Entity.subscribe) Entity.subscribe((s) => ingest(s));      // pushed by shared.js (cloud, other tabs, local saves)
+  else {                                                                           // shared.js missing: read the browser copy directly
+    window.addEventListener('storage', (e) => { if (e.key === STATE_KEY || e.key === null) pull(); });
+    try { new BroadcastChannel(CHANNEL).onmessage = pull; } catch (_) {}
+  }
+  pull(); setInterval(pull, 1000);                                                // safety net; unchanged state is ignored
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+}
+document.addEventListener('DOMContentLoaded', boot);
+})();
 </script>
 </body>
 </html>
