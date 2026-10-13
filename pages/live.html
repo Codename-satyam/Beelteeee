@@ -235,7 +235,7 @@ body.live-overlay .toss-banner strong {
   background: radial-gradient(ellipse at center, rgba(var(--ov-killer), .32), rgba(3,3,6,.92) 75%);
   backdrop-filter: blur(6px); animation: win-in .5s ease both;
 }
-.win-celebration[hidden] { display: none; }
+.win-celebration:not([hidden]) { display: flex; }
 .win-celebration::before { content: ""; position: absolute; left: 50%; top: 50%; width: 30vmin; height: 30vmin; margin: -15vmin 0 0 -15vmin; border-radius: 50%; border: 3px solid rgb(var(--ov-gold)); animation: lp-shock 1.4s ease-out both; }
 .win-particles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .win-particles i { position: absolute; top: -10px; width: 6px; height: 14px; background: rgb(var(--ov-gold)); opacity: .9; animation: win-fall linear infinite; }
