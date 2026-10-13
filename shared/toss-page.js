@@ -40,11 +40,12 @@
   function stageFor(match) {
     if (!match.toss) return 'toss';
     if (match.mapVeto && match.mapVeto.finalMap) return 'done';
+    if (!match.roles) return 'side';   // toss winner must choose Killer / Survivor first
     return 'maps';
   }
 
   function setActiveMarker(stage) {
-    const order = { toss: 0, maps: 1, done: 2 };
+    const order = { toss: 0, side: 1, maps: 2, done: 3 };
     document.querySelectorAll('[data-step-marker]').forEach((element) => {
       const key = element.dataset.stepMarker;
       element.classList.toggle('active', key === stage);
@@ -65,7 +66,13 @@
 
   function renderTossBanner(state, match) {
     const toss = match.toss || {};
-    return `<div class="toss-result-line"><span>COIN · ${esc(toss.side || '—')}</span><strong>${esc(Entity.teamName(state, toss.winnerId))}</strong><small>${esc(Entity.teamName(state, toss.callerId))} called ${esc(toss.calledSide || '—')} · first map ban</small></div>`;
+    return `<div class="toss-result-line"><span>COIN · ${esc(toss.side || '—')}</span><strong>${esc(Entity.teamName(state, toss.winnerId))}</strong><small>${esc(Entity.teamName(state, toss.callerId))} called ${esc(toss.calledSide || '—')} · first map ban</small></div>${renderSideLine(state, match)}`;
+  }
+
+  function renderSideLine(state, match) {
+    if (!match.roles) return '';
+    const g1 = Entity.rolesFor(match, 1);
+    return `<div class="toss-result-line"><span>GAME 1 SIDES</span><strong>${esc(Entity.teamName(state, match.roles.chooserId))} chose ${esc(String(match.roles.choice).toUpperCase())}</strong><small>${esc(Entity.teamName(state, g1.killerId))} Killer · ${esc(Entity.teamName(state, g1.survivorId))} Survivor · sides swap in Game 2</small></div>`;
   }
 
   function renderBanHistory(state, match) {
@@ -117,9 +124,10 @@
       return;
     }
 
-    $('toss-status').textContent = stage === 'done' ? 'Map locked' : stage === 'toss' ? 'Awaiting toss' : 'Map voting';
-    $('toss-status').className = stage === 'done' ? 'status completed' : stage === 'toss' ? 'status pending' : 'status in_progress';
+    $('toss-status').textContent = stage === 'done' ? 'Map locked' : stage === 'toss' ? 'Awaiting toss' : stage === 'side' ? 'Choose side' : 'Map voting';
+    $('toss-status').className = stage === 'done' ? 'status completed' : (stage === 'toss' || stage === 'side') ? 'status pending' : 'status in_progress';
     if (stage === 'toss') renderTossStage(state, match, teams);
+    else if (stage === 'side') renderSideStage(state, match, teams);
     else if (stage === 'maps') renderMapStage(state, match, teams);
     else renderDoneStage(state, match, teams);
   }
@@ -135,6 +143,32 @@
         </article>
         <article class="panel coin-panel"><div class="eyebrow">Fate protocol // ${esc(match.roundName)} · M${match.matchNumber}</div><div class="coin-stage"><div class="coin ${flipping ? 'flipping' : ''}" id="ceremony-coin"><div class="coin-inner"><span>${flipping ? '…' : 'ENTITY'}<small>${flipping ? 'FATE IS TURNING' : 'FLIP TO BEGIN'}</small></span></div></div><div><div class="eyebrow">${esc(teams.a)} <span class="muted">vs</span> ${esc(teams.b)}</div><h3 class="panel-title" style="font-size:2rem;margin:8px 0">${flipping ? 'THE ENTITY IS DECIDING' : 'The next match awaits'}</h3><p class="hint">Call heads or tails, then reveal the toss and map pool.</p></div></div></article>
       </section>`;
+  }
+
+  function renderSideStage(state, match, teams) {
+    const winnerId = match.toss && match.toss.winnerId;
+    const winnerName = Entity.teamName(state, winnerId);
+    const otherName = Entity.teamName(state, otherTeam(match, winnerId));
+    $('wizard').innerHTML = `<section class="panel setup-complete-panel side-choice-panel">
+      <div class="eyebrow">Stage 02 / Choose side</div>
+      <h3>${esc(winnerName.toUpperCase())} — CHOOSE YOUR SIDE</h3>
+      <p>${esc(winnerName)} won the toss and decides what to play in Game 1. ${esc(otherName)} takes the other side, and the sides swap in Game 2.</p>
+      ${renderTossBanner(state, match)}
+      <div class="draft-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <button class="draft-card" type="button" data-action="choose-side" data-role="killer"><span class="draft-index">GAME 1</span><strong>PLAY KILLER</strong><small>${esc(winnerName)} Killer · ${esc(otherName)} Survivor</small></button>
+        <button class="draft-card" type="button" data-action="choose-side" data-role="survivor"><span class="draft-index">GAME 1</span><strong>PLAY SURVIVOR</strong><small>${esc(winnerName)} Survivor · ${esc(otherName)} Killer</small></button>
+      </div>
+      <div class="actions"><button class="button danger" data-action="restart-setup" ${match.status === 'completed' ? 'disabled' : ''}>Restart match setup</button></div>
+    </section>`;
+  }
+
+  function chooseSide(role) {
+    if (!selectedId) return;
+    Entity.update((state) => {
+      const match = findMatch(state, selectedId);
+      if (!match || match.status === 'completed' || !match.toss || !match.toss.winnerId) return;
+      Entity.setSideChoice(state, match.id, match.toss.winnerId, role);
+    });
   }
 
   function renderMapStage(state, match, teams) {
@@ -213,6 +247,7 @@
         const current = findMatch(draft, selectedId);
         if (!current) return;
         current.toss = { winnerId, side, callerId, calledSide, choice: 'First map ban', savedAt: new Date().toISOString() };
+        current.roles = null;
         current.mapVeto = { pool: mapOptions, bans: [], finalMap: null, confirmed: false };
         current.setupComplete = false;
         draft.activeMatchId = selectedId;
@@ -256,6 +291,7 @@
       const match = findMatch(state, selectedId);
       if (!match) return;
       match.toss = null;
+      match.roles = null;
       match.mapVeto = null;
       match.setupComplete = false;
       match.scorecard = null;
@@ -283,6 +319,7 @@
     if (action === 'flip') flipToss();
     if (action === 'init-map-pool') initializeMapVeto();
     if (action === 'ban-map') banMap(button.dataset.map);
+    if (action === 'choose-side') chooseSide(button.dataset.role);
     if (action === 'reroll-maps') {
       const match = findMatch(Entity.load(), selectedId);
       if (match && match.mapVeto && !match.mapVeto.bans.length) initializeMapVeto();

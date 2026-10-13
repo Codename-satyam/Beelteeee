@@ -145,7 +145,9 @@ function normalize(r) {
     tossWinnerId: first,
     pool: (veto.pool || []).map(m => typeof m === 'string' ? { id:m, name:m } : { id:m.id ?? m.name, name:m.name ?? m.id, image:m.image || m.img }),
     bans, finalMap,
-    turn: first && !finalMap ? (bans.length % 2 === 0 ? first : second) : null,
+    sides: (match.roles && window.Entity && Entity.rolesFor) ? (() => { const g = Entity.rolesFor(match, 1); return `${teamN(g.killerId)} KILLER · ${teamN(g.survivorId)} SURVIVOR`; })() : '',
+    sidePending: Boolean(first && !match.roles && !finalMap),
+    turn: first && !finalMap && match.roles ? (bans.length % 2 === 0 ? first : second) : null,
     // stable per match + result: a re-save of the same toss must NOT replay the coin flip
     tossKey: `${match.id}:${toss.side || ''}:${first || ''}`
   };
@@ -172,14 +174,14 @@ function render(st) {
   if (st.finalMap) {
     const m = st.pool.find(p => p.id === st.finalMap) || { name: st.finalMap };
     $('finalmap').textContent = m.name; $('finalvs').textContent = `${st.teamAName}  vs  ${st.teamBName}`;
-    $('phase').textContent = 'Map locked'; $('turn').textContent = '';
+    $('phase').textContent = 'Map locked'; $('turn').textContent = st.sides || '';
     show('done'); syncBans(st, true); return;
   }
   if (!st.bans.length && st.coin && st.tossWinnerId && prev.coinShown !== st.tossKey) { runToss(st); return; }
   if (!st.pool.length) { show('idle'); return; }
 
-  $('phase').textContent = 'Map veto';
-  $('turn').textContent = st.turn ? `${teamName(st, st.turn)} to ban` : '';
+  if (st.sidePending) { $('phase').textContent = 'Side choice'; $('turn').textContent = `${teamName(st, st.tossWinnerId)} choosing Killer or Survivor`; }
+  else { $('phase').textContent = st.sides ? `Map veto · ${st.sides}` : 'Map veto'; $('turn').textContent = st.turn ? `${teamName(st, st.turn)} to ban` : ''; }
   show('veto'); syncBans(st);
 }
 

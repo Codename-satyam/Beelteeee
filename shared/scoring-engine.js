@@ -59,14 +59,16 @@
     };
   }
 
-  function calculateMatch(scorecardValue) {
+  function calculateMatch(scorecardValue, game1KillerIsA) {
+    // game1KillerIsA: true (default / legacy) = Team A is Killer in Game 1; false = Team B is Killer in Game 1.
+    const aKillsFirst = game1KillerIsA !== false;
     const scorecard = normalizeScorecard(scorecardValue);
-    const game1 = calculateGame(scorecard.game1); // Team A = Killer, Team B = Survivor
-    const game2 = calculateGame(scorecard.game2); // Team B = Killer, Team A = Survivor
+    const game1 = calculateGame(scorecard.game1); // Game 1: the toss winner's chosen side
+    const game2 = calculateGame(scorecard.game2); // Game 2: roles swapped
     return {
       scorecard, game1, game2,
-      teamA: game1.killerScore + game2.survivorScore,
-      teamB: game1.survivorScore + game2.killerScore,
+      teamA: aKillsFirst ? game1.killerScore + game2.survivorScore : game1.survivorScore + game2.killerScore,
+      teamB: aKillsFirst ? game1.survivorScore + game2.killerScore : game1.killerScore + game2.survivorScore,
       bothConfirmed: scorecard.game1.confirmed && scorecard.game2.confirmed,
       game1Confirmed: scorecard.game1.confirmed,
       game2Confirmed: scorecard.game2.confirmed

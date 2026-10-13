@@ -276,6 +276,7 @@
     match.winnerId = null;
     match.status = 'pending';
     match.toss = null;
+    match.roles = null;
     match.mapVeto = null;
     match.setupComplete = false;
     match.scorecard = null;
@@ -336,6 +337,7 @@
           status: 'pending',
           winnerId: null,
           toss: null,
+          roles: null,
           mapVeto: null,
           setupComplete: false,
           scorecard: null,
@@ -442,6 +444,33 @@
     return match;
   }
 
+  // Side choice: the toss winner picks Killer or Survivor for Game 1 (Game 2 swaps automatically).
+  function setSideChoice(state, matchId, teamId, role) {
+    const match = state.matches.find((item) => item.id === matchId);
+    if (!match || !match.teamAId || !match.teamBId) throw new Error('Choose a match with two teams first.');
+    if (teamId !== match.teamAId && teamId !== match.teamBId) throw new Error('Unknown team.');
+    if (role !== 'killer' && role !== 'survivor') throw new Error('Role must be killer or survivor.');
+    const other = teamId === match.teamAId ? match.teamBId : match.teamAId;
+    match.roles = {
+      chooserId: teamId, choice: role,
+      game1KillerId: role === 'killer' ? teamId : other,
+      game1SurvivorId: role === 'killer' ? other : teamId,
+      savedAt: new Date().toISOString()
+    };
+    return match;
+  }
+
+  // Single source of truth for who plays which side in a given game.
+  // Matches without a saved choice (older data) keep the legacy rule: Team A is Killer in Game 1.
+  function rolesFor(match, gameNo) {
+    match = match || {};
+    const r = match.roles;
+    const valid = r && (r.game1KillerId === match.teamAId || r.game1KillerId === match.teamBId);
+    const g1Killer = valid ? r.game1KillerId : match.teamAId;
+    const g1Survivor = g1Killer === match.teamAId ? match.teamBId : match.teamAId;
+    return Number(gameNo) === 2 ? { killerId: g1Survivor, survivorId: g1Killer } : { killerId: g1Killer, survivorId: g1Survivor };
+  }
+
   function activeMatch(state) {
     // Single source of truth for "the current match" (used by every screen).
     // The LIVE match wins, so merely browsing a match or finishing one can't move the overlays.
@@ -468,6 +497,8 @@
     setLive,
     savePoints,
     addToss,
+    setSideChoice,
+    rolesFor,
     activeMatch,
     cloud: { configured: isCloudConfigured, get client() { return supabaseClient; }, get isController() { return authorized; }, get status() { return cloudStatus; } }
   };

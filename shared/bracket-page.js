@@ -36,7 +36,7 @@
   }
 
   function getScoreResult(match) {
-    return scoreEngine.calculateMatch(scoreEngine.normalizeScorecard(match && match.scorecard));
+    return scoreEngine.calculateMatch(scoreEngine.normalizeScorecard(match && match.scorecard), Entity.rolesFor(match, 1).killerId === (match && match.teamAId));
   }
 
   function renderBracket(state) {
@@ -137,14 +137,12 @@
     const card = scoreEngine.normalizeScorecard(match.scorecard);
     const gameKey = scoringGameNo === 1 ? 'game1' : 'game2';
     const game = card[gameKey];
-    const result = scoreEngine.calculateMatch(card);
+    const result = scoreEngine.calculateMatch(card, Entity.rolesFor(match, 1).killerId === match.teamAId);
     const roundResult = scoringGameNo === 1 ? result.game1 : result.game2;
 
-    // Game 1: Team A is Killer and Team B is Survivor (same as scoring-engine.js and live.html).
-    // Game 2 swaps the roles: Team B is Killer and Team A is Survivor.
-    const roles = scoringGameNo === 1
-      ? { killerId: match.teamAId, survivorId: match.teamBId }
-      : { killerId: match.teamBId, survivorId: match.teamAId };
+    // Game 1 roles come from the toss winner's side choice (see toss page); Game 2 swaps them.
+    const roles = Entity.rolesFor(match, scoringGameNo);
+    const g1 = Entity.rolesFor(match, 1), g2 = Entity.rolesFor(match, 2);
 
     const killerName = Entity.teamName(state, roles.killerId);
     const survivorName = Entity.teamName(state, roles.survivorId);
@@ -169,8 +167,8 @@
         <button type="button" class="modal-close" data-score-action="close" aria-label="Close scoring menu">×</button>
       </header>
       <div class="scoring-tabs">
-        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,match.teamAId))} Killer · ${esc(Entity.teamName(state,match.teamBId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}</span></button>
-        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,match.teamBId))} Killer · ${esc(Entity.teamName(state,match.teamAId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===1?'active':''} ${card.game1.confirmed?'confirmed':''}" data-score-action="game" data-game="1"><b>GAME 1</b><small>${esc(Entity.teamName(state,g1.killerId))} Killer · ${esc(Entity.teamName(state,g1.survivorId))} Survivor</small><span>${card.game1.confirmed?'CONFIRMED':'INCOMPLETE'}</span></button>
+        <button type="button" class="score-tab ${scoringGameNo===2?'active':''} ${card.game2.confirmed?'confirmed':''}" data-score-action="game" data-game="2" ${!gameOneReady?'disabled':''}><b>GAME 2</b><small>${esc(Entity.teamName(state,g2.killerId))} Killer · ${esc(Entity.teamName(state,g2.survivorId))} Survivor</small><span>${card.game2.confirmed?'CONFIRMED':gameOneReady?'INCOMPLETE':'LOCKED · FINISH GAME 1'}</span></button>
       </div>
       <div class="scoring-rule-strip"><span>SCORING IS ACTION-BASED</span><span>Survivor: max 18</span><span>Killer: max 19</span></div>
       <div class="scoring-role-heading"><span class="role-survivor">SURVIVOR</span><b>${esc(survivorName)}</b><span class="role-killer">KILLER</span><b>${esc(killerName)}</b></div>
@@ -261,7 +259,7 @@
       mutator(match.scorecard, match);
       if (invalidateOtherGame && editedGameNo === 1) match.scorecard.game2.confirmed = false;
       match.tiebreakWinnerId = null;
-      const result = scoreEngine.calculateMatch(match.scorecard);
+      const result = scoreEngine.calculateMatch(match.scorecard, Entity.rolesFor(match, 1).killerId === match.teamAId);
       Entity.savePoints(state, match.id, result.teamA, result.teamB, false, null);
     });
     render();

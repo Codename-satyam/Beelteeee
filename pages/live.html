@@ -1820,7 +1820,11 @@
           null;
 
         let killerIsA = null;
-        if (savedKillerId != null) {
+        // Toss winner's side choice (Game 1); Game 2 is the swap. Takes priority over everything below.
+        if (window.Entity && Entity.rolesFor && match.roles && match.roles.game1KillerId) {
+          killerIsA = Entity.rolesFor(match, gameNo).killerId === match.teamAId;
+        }
+        if (killerIsA == null && savedKillerId != null) {
           if (savedKillerId === match.teamAId) killerIsA = true;
           else if (savedKillerId === match.teamBId) killerIsA = false;
         }
